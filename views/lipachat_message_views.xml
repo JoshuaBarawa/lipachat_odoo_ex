@@ -154,14 +154,13 @@
                 <tree string="WhatsApp Messages" 
                       decoration-success="state=='sent'" 
                       decoration-danger="state=='failed'" 
-                      decoration-warning="state=='partially_sent'"
-                      decoration-muted="is_bulk_template">
-                    <field name="create_date"/>
-                    <field name="partner_id"/>
-                    <field name="phone_number"/>
-                    <field name="message_type"/>
+                      decoration-warning="state=='partially_sent'">
+                    <field name="create_date" string="Created on"/>
+                    <field name="partner_id" string="Contact"/>
+                    <field name="phone_number" string="Phone Number"/>
+                    <field name="message_type" string="Message Type"/>
                     <field name="message_text" string="Content"/>
-                    <field name="state"/>
+                    <field name="state" string="Status"/>
                     <field name="bulk_parent_id" invisible="1"/>
                     <field name="is_bulk_template" invisible="1"/>
                 </tree>
@@ -233,11 +232,12 @@
             </field>
         </record>
 
-        <!-- Main Message Action (shows all) -->
+        <!-- Main Message Action (shows only individual messages) -->
         <record id="action_lipachat_message" model="ir.actions.act_window">
             <field name="name">WhatsApp Messages</field>
             <field name="res_model">lipachat.message</field>
             <field name="view_mode">tree,form</field>
+            <field name="domain">[('is_bulk_template', '=', False)]</field>
             <field name="search_view_id" ref="view_lipachat_message_search"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
