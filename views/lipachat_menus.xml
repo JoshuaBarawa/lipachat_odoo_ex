@@ -21,13 +21,6 @@
                   action="action_lipachat_template" 
                   sequence="20"/>
 
-        <!-- Flows Menu -->
-        <menuitem id="menu_lipachat_flows" 
-                  name="Flows" 
-                  parent="menu_lipachat_main" 
-                  action="action_lipachat_flow" 
-                  sequence="30"/>
-
         <!-- Configuration Menu -->
         <menuitem id="menu_lipachat_config" 
                   name="Configuration" 

@@ -46,12 +46,6 @@
                                     <field name="template_language"/>
                                     <field name="template_data" widget="ace" options="{'mode': 'json'}"/>
                                 </group>
-                                <group string="WhatsApp Flow">
-                                    <field name="flow_id"/>
-                                    <field name="flow_cta"/>
-                                    <field name="flow_screen"/>
-                                    <field name="flow_data" widget="ace" options="{'mode': 'json'}"/>
-                                </group>
                             </page>
 
                             <page string="Response Details">

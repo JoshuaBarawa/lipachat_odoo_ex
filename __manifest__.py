@@ -13,7 +13,6 @@
         * Send interactive buttons
         * Send interactive lists
         * Create and manage message templates
-        * Send WhatsApp flows
         * Track message delivery status
         
         Features:
@@ -23,7 +22,6 @@
         * Message history tracking
         * Template management
         * Automated notifications
-        * Flow management
         
         Setup:
         ------
@@ -41,7 +39,6 @@
         'views/lipachat_config_views.xml',
         'views/lipachat_message_views.xml',
         'views/lipachat_template_views.xml',
-        'views/lipachat_flow_views.xml',
         'views/res_partner_views.xml',
         'views/lipachat_menus.xml',
         'wizard/send_whatsapp_wizard_views.xml',

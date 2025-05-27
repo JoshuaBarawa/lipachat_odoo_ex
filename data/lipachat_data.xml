@@ -6,6 +6,8 @@
             <field name="name">LipaChat Gateway</field>
             <field name="api_base_url">https://gateway.lipachat.com/api/v1</field>
             <field name="active">True</field>
+            <field name="default_from_number">254110090747</field>
+            
         </record>
     </data>
 </odoo>

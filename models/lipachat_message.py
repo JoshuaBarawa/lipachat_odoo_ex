@@ -23,7 +23,6 @@ class LipachatMessage(models.Model):
         ('buttons', 'Interactive Buttons'),
         ('list', 'Interactive List'),
         ('template', 'Template Message'),
-        ('flow', 'WhatsApp Flow')
     ], 'Message Type', required=True, default='text')
     
     # Text message fields
@@ -50,11 +49,7 @@ class LipachatMessage(models.Model):
     template_language = fields.Char('Template Language', default='en')
     template_data = fields.Text('Template Data (JSON)')
     
-    # Flow fields
-    flow_id = fields.Char('Flow ID')
-    flow_cta = fields.Char('Flow CTA')
-    flow_screen = fields.Char('Flow Screen')
-    flow_data = fields.Text('Flow Data (JSON)')
+
     
     # Status fields
     state = fields.Selection([
@@ -87,8 +82,6 @@ class LipachatMessage(models.Model):
                 self._send_list_message(config, headers)
             elif self.message_type == 'template':
                 self._send_template_message(config, headers)
-            elif self.message_type == 'flow':
-                self._send_flow_message(config, headers)
                 
         except Exception as e:
             self.state = 'failed'
@@ -194,30 +187,6 @@ class LipachatMessage(models.Model):
         
         response = requests.post(
             f"{config.api_base_url}/whatsapp/template",
-            headers=headers,
-            json=data,
-            timeout=30
-        )
-        
-        self._handle_response(response)
-    
-    def _send_flow_message(self, config, headers):
-        """Send WhatsApp flow message"""
-        flow_data = json.loads(self.flow_data) if self.flow_data else {}
-        
-        data = {
-            "messageId": self.message_id,
-            "to": self.phone_number,
-            "from": self.from_number or config.default_from_number,
-            "text": self.body_text,
-            "flowId": self.flow_id,
-            "flowCta": self.flow_cta,
-            "screen": self.flow_screen,
-            "data": flow_data
-        }
-        
-        response = requests.post(
-            f"{config.api_base_url}/whatsapp/interactive/flows",
             headers=headers,
             json=data,
             timeout=30

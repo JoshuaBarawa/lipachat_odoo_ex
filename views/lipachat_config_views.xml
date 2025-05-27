@@ -1,45 +1,249 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <!-- Custom CSS for LipaChat Configuration -->
+        <template id="lipachat_config_assets" name="LipaChat Config Assets">
+            <style type="text/css">
+                /* LipaChat Configuration Styling */
+                .lipachat-config-form {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                    min-height: 100vh;
+                    padding: 20px;
+                }
+                
+                .lipachat-config-form .o_form_sheet_bg {
+                    background: white !important;
+                    border-radius: 15px !important;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1) !important;
+                    padding: 30px !important;
+                    margin: 20px auto !important;
+                    max-width: 1200px !important;
+                }
+                
+                .lipachat-config-form .oe_title h1 {
+                    color: #2c3e50 !important;
+                    font-weight: 700 !important;
+                    margin-bottom: 30px !important;
+                    text-align: center !important;
+                    position: relative !important;
+                }
+                
+                .lipachat-config-form .oe_title h1:after {
+                    content: '';
+                    position: absolute;
+                    bottom: -10px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 80px;
+                    height: 3px;
+                    background: linear-gradient(90deg, #667eea, #764ba2);
+                    border-radius: 2px;
+                }
+                
+                .lipachat-config-form .o_form_sheet > header {
+                    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%) !important;
+                    padding: 15px 25px !important;
+                    border-radius: 10px !important;
+                    margin-bottom: 25px !important;
+                    text-align: center !important;
+                    border: none !important;
+                }
+                
+                .lipachat-config-form .btn-primary {
+                    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%) !important;
+                    border: none !important;
+                    padding: 12px 30px !important;
+                    border-radius: 25px !important;
+                    font-weight: 600 !important;
+                    font-size: 14px !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 1px !important;
+                    transition: all 0.3s ease !important;
+                    box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3) !important;
+                }
+                
+                .lipachat-config-form .btn-primary:hover {
+                    transform: translateY(-2px) !important;
+                    box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4) !important;
+                }
+                
+                .lipachat-config-form .o_group {
+                    background: #f8f9fa !important;
+                    padding: 25px !important;
+                    border-radius: 12px !important;
+                    margin-bottom: 20px !important;
+                    border: 1px solid #e9ecef !important;
+                }
+                
+                .lipachat-config-form .o_form_label {
+                    color: #495057 !important;
+                    font-weight: 600 !important;
+                    font-size: 13px !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.5px !important;
+                    margin-bottom: 8px !important;
+                }
+                
+                .lipachat-config-form .o_field_widget input,
+                .lipachat-config-form .o_field_widget select {
+                    border-radius: 8px !important;
+                    border: 2px solid #e9ecef !important;
+                    padding: 12px 15px !important;
+                    font-size: 14px !important;
+                    transition: all 0.3s ease !important;
+                    background: white !important;
+                }
+                
+                .lipachat-config-form .o_field_widget input:focus,
+                .lipachat-config-form .o_field_widget select:focus {
+                    border-color: #667eea !important;
+                    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+                    outline: none !important;
+                }
+                
+                .lipachat-config-form .o_field_widget.o_readonly input {
+                    background: #f1f3f4 !important;
+                    color: #6c757d !important;
+                    cursor: not-allowed !important;
+                    border-color: #dee2e6 !important;
+                }
+                
+                .lipachat-config-form .nav-tabs {
+                    border: none !important;
+                    margin-top: 30px !important;
+                }
+                
+                .lipachat-config-form .nav-tabs .nav-link {
+                    background: transparent !important;
+                    border: 2px solid transparent !important;
+                    color: #6c757d !important;
+                    font-weight: 600 !important;
+                    padding: 12px 25px !important;
+                    border-radius: 25px !important;
+                    margin-right: 10px !important;
+                    transition: all 0.3s ease !important;
+                }
+                
+                .lipachat-config-form .nav-tabs .nav-link.active {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                    color: white !important;
+                    border-color: transparent !important;
+                }
+                
+                .lipachat-config-form .tab-content {
+                    background: white !important;
+                    padding: 25px !important;
+                    border-radius: 12px !important;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+                    margin-top: 15px !important;
+                }
+                
+                .lipachat-config-form .getting-started-content {
+                    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%) !important;
+                    padding: 25px !important;
+                    border-radius: 12px !important;
+                    border-left: 4px solid #25D366 !important;
+                }
+                
+                .lipachat-config-form .getting-started-content p {
+                    font-size: 15px !important;
+                    line-height: 1.8 !important;
+                    color: #2c3e50 !important;
+                    margin: 0 !important;
+                }
+                
+                .lipachat-config-form .getting-started-content a {
+                    color: #25D366 !important;
+                    font-weight: 600 !important;
+                    text-decoration: none !important;
+                    transition: all 0.3s ease !important;
+                }
+                
+                .lipachat-config-form .getting-started-content a:hover {
+                    color: #128C7E !important;
+                    text-decoration: underline !important;
+                }
+                
+                /* Tree View Styling */
+                .lipachat-config-tree .o_list_table thead th {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                    color: white !important;
+                    font-weight: 600 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.5px !important;
+                    border: none !important;
+                }
+                
+                .lipachat-config-tree .o_list_table tbody tr:hover {
+                    background: rgba(102, 126, 234, 0.05) !important;
+                }
+                
+                /* Status badges */
+                .lipachat-config-form .o_field_boolean .custom-control-input:checked ~ .custom-control-label::before {
+                    background: #25D366 !important;
+                    border-color: #25D366 !important;
+                }
+                
+                /* Responsive Design */
+                @media (max-width: 768px) {
+                    .lipachat-config-form .o_form_sheet_bg {
+                        margin: 10px !important;
+                        padding: 20px !important;
+                    }
+                    
+                    .lipachat-config-form .o_group {
+                        padding: 15px !important;
+                    }
+                }
+            </style>
+        </template>
+
         <!-- Configuration Form View -->
         <record id="view_lipachat_config_form" model="ir.ui.view">
             <field name="name">lipachat.config.form</field>
             <field name="model">lipachat.config</field>
             <field name="arch" type="xml">
-                <form string="LipaChat Configuration">
+                <form string="LipaChat Configuration" class="lipachat-config-form">
                     <header>
-                        <!-- Removed attrs, so button always visible -->
-                        <button name="test_api_connection" string="Test Connection" type="object" class="btn-primary"/>
+                        <button name="test_api_connection" string="🔗 Test Connection" type="object" class="btn-primary"/>
                     </header>
                     <sheet>
                         <div class="oe_title">
                             <h1>
-                                <field name="name" placeholder="Configuration Name"/>
+                                <field name="name" placeholder="Configuration Name" required="1"/>
                             </h1>
                         </div>
                         <group>
-                            <group>
-                                <field name="api_key" password="True" placeholder="Enter your API key from https://app.lipachat.com"/>
-                                <field name="api_base_url"/>
-                                <field name="default_from_number" placeholder="e.g., 254110090747"/>
+                            <group string="📡 API Configuration">
+                                <field name="api_key" password="True" placeholder="Enter your API key from https://app.lipachat.com/app/settings" required="1"/>
+                                <field name="api_base_url" readonly="1" force_save="1"/>
+                                <field name="default_from_number" placeholder="e.g.254110090747" required="1"/>
                             </group>
-                            <group>
+                            <group string="⚙️ Settings">
                                 <field name="active"/>
                                 <field name="test_connection" invisible="1"/>
                             </group>
                         </group>
                         <notebook>
-                            <page string="API Information">
-                                <group>
+                            <page string="🚀 Getting Started">
+                                <div class="getting-started-content">
                                     <p>
-                                        <strong>Getting Started:</strong><br/>
-                                        1. Create an account at <a href="https://app.lipachat.com/auth/signup" target="_blank">https://app.lipachat.com/auth/signup</a><br/>
-                                        2. Get your API key from the dashboard<br/>
-                                        3. Enter your API key above and test the connection<br/>
-                                        4. Configure your default WhatsApp Business number<br/>
-                                        5. Start sending WhatsApp messages from contacts and other modules
+                                        <strong>Step 1:</strong> Create an account at <a href="https://app.lipachat.com/auth/signup" target="_blank">https://app.lipachat.com/auth/signup</a><br/><br/>
+                                        <strong>Step 2:</strong> Get your API key at <a href="https://app.lipachat.com/app/settings" target="_blank">https://app.lipachat.com/app/settings</a><br/><br/>
+                                        <strong>Step 3:</strong> Enter your API key above and test the connection<br/><br/>
+                                        <strong>Step 4:</strong> Configure your WhatsApp Business number here: <a href="https://app.lipachat.com/app/golive" target="_blank">https://app.lipachat.com/app/golive</a><br/><br/>
+                                        <strong>Step 5:</strong> Start sending WhatsApp messages/templates from contacts and other modules
                                     </p>
-                                </group>
+                                </div>
+                            </page>
+                            <page string="📚 Documentation">
+                                <div class="getting-started-content">
+                                    <p>
+                                        <strong>API Documentation:</strong> <a href="https://docs.lipachat.com" target="_blank">https://docs.lipachat.com</a><br/><br/>
+                                        <strong>Support:</strong> For technical support, contact us at <a href="mailto:support@lipachat.com">support@lipachat.com</a><br/><br/>
+                                        <strong>WhatsApp Business API:</strong> Learn more about WhatsApp Business API features and limitations at <a href="https://developers.facebook.com/docs/whatsapp" target="_blank">Facebook Developers</a>
+                                    </p>
+                                </div>
                             </page>
                         </notebook>
                     </sheet>
@@ -52,17 +256,17 @@
             <field name="name">lipachat.config.tree</field>
             <field name="model">lipachat.config</field>
             <field name="arch" type="xml">
-                <tree string="LipaChat Configurations">
+                <tree string="LipaChat Configurations" class="lipachat-config-tree">
                     <field name="name"/>
                     <field name="default_from_number"/>
-                    <field name="active"/>
+                    <field name="active" widget="boolean_toggle"/>
                 </tree>
             </field>
         </record>
 
         <!-- Configuration Action -->
         <record id="action_lipachat_config" model="ir.actions.act_window">
-            <field name="name">LipaChat Configuration</field>
+            <field name="name">🚀 LipaChat Configuration</field>
             <field name="res_model">lipachat.config</field>
             <field name="view_mode">tree,form</field>
             <field name="help" type="html">
@@ -70,7 +274,7 @@
                     Configure your LipaChat WhatsApp Gateway settings
                 </p>
                 <p>
-                    Set up your API key and default settings to start sending WhatsApp messages.
+                    Set up your API key and default settings to start sending WhatsApp messages through WhatsApp Business API.
                 </p>
             </field>
         </record>

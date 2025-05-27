@@ -55,17 +55,7 @@
                                            placeholder='{"header": {"parameter": "Value"}, "body": {"placeholders": ["Value1", "Value2"]}}'/>
                                 </group>
                             </page>
-                            
-                            <page string="Flow">
-                                <group>
-                                    <field name="flow_id" domain="[('status', '=', 'published')]"/>
-                                    <field name="body_text" placeholder="Flow introduction message..."/>
-                                    <field name="flow_cta" placeholder="Button text (e.g., 'Get Started')"/>
-                                    <field name="flow_screen" placeholder="Initial screen name"/>
-                                    <field name="flow_data" widget="ace" options="{'mode': 'json'}" 
-                                           placeholder='{"key1": "value1", "key2": "value2"}'/>
-                                </group>
-                            </page>
+                        
                         </notebook>
                     </sheet>
                     <footer>

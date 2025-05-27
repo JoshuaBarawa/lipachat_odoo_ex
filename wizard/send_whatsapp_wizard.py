@@ -17,7 +17,6 @@ class SendWhatsappWizard(models.TransientModel):
         ('buttons', 'Interactive Buttons'),
         ('list', 'Interactive List'),
         ('template', 'Template Message'),
-        ('flow', 'WhatsApp Flow')
     ], 'Message Type', default='text', required=True)
     
     # Text message
@@ -48,11 +47,6 @@ class SendWhatsappWizard(models.TransientModel):
     template_id = fields.Many2one('lipachat.template', 'Template')
     template_data = fields.Text('Template Parameters (JSON)')
     
-    # Flow
-    flow_id = fields.Many2one('lipachat.flow', 'Flow')
-    flow_cta = fields.Char('Flow CTA')
-    flow_screen = fields.Char('Flow Screen')
-    flow_data = fields.Text('Flow Data (JSON)')
     
     @api.onchange('partner_id')
     def _onchange_partner_id(self):
@@ -102,14 +96,6 @@ class SendWhatsappWizard(models.TransientModel):
                 'template_name': self.template_id.name if self.template_id else '',
                 'template_language': self.template_id.language if self.template_id else 'en',
                 'template_data': self.template_data or '{}',
-            })
-        elif self.message_type == 'flow':
-            message_data.update({
-                'flow_id': self.flow_id.flow_id if self.flow_id else '',
-                'flow_cta': self.flow_cta,
-                'flow_screen': self.flow_screen,
-                'flow_data': self.flow_data or '{}',
-                'body_text': self.body_text,
             })
         
         message = self.env['lipachat.message'].create(message_data)
