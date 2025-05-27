@@ -161,8 +161,8 @@
                     <field name="message_type" string="Message Type"/>
                     <field name="message_text" string="Content"/>
                     <field name="state" string="Status"/>
-                    <field name="bulk_parent_id" invisible="1"/>
-                    <field name="is_bulk_template" invisible="1"/>
+                    <!-- <field name="bulk_parent_id" invisible="1"/>
+                    <field name="is_bulk_template" invisible="1"/> -->
                 </tree>
             </field>
         </record>
