@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lipachat_config,lipachat.config,model_lipachat_config,base.group_user,1,1,1,1
+access_lipachat_message,lipachat.message,model_lipachat_message,base.group_user,1,1,1,1
+access_lipachat_template,lipachat.template,model_lipachat_template,base.group_user,1,1,1,1
+access_lipachat_flow,lipachat.flow,model_lipachat_flow,base.group_user,1,1,1,1

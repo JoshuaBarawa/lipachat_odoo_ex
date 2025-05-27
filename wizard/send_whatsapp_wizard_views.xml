@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Send WhatsApp Wizard Form -->
+        <record id="view_send_whatsapp_wizard_form" model="ir.ui.view">
+            <field name="name">send.whatsapp.wizard.form</field>
+            <field name="model">send.whatsapp.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Send WhatsApp Message">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="partner_id"/>
+                                <field name="phone_number"/>
+                                <field name="from_number"/>
+                            </group>
+                            <group>
+                                <field name="message_type"/>
+                            </group>
+                        </group>
+                        
+                        <notebook>
+                            <page string="Message">
+                                <group>
+                                    <field name="message_text" nolabel="1" placeholder="Enter your WhatsApp message..."/>
+                                </group>
+                            </page>
+                            
+                            <page string="Media">
+                                <group>
+                                    <field name="media_type"/>
+                                    <field name="media_url" placeholder="https://example.com/image.jpg"/>
+                                    <field name="caption"/>
+                                </group>
+                            </page>
+                            
+                            <page string="Buttons">
+                                <group>
+                                    <field name="body_text" placeholder="Your message text..."/>
+                                </group>
+                                <group string="Buttons (Max 3)">
+                                    <field name="button_1_id" string="Button 1 ID"/>
+                                    <field name="button_1_title" string="Button 1 Title"/>
+                                    <field name="button_2_id" string="Button 2 ID"/>
+                                    <field name="button_2_title" string="Button 2 Title"/>
+                                    <field name="button_3_id" string="Button 3 ID"/>
+                                    <field name="button_3_title" string="Button 3 Title"/>
+                                </group>
+                            </page>
+                            
+                            <page string="Template">
+                                <group>
+                                    <field name="template_id" domain="[('status', '=', 'approved')]"/>
+                                    <field name="template_data" widget="ace" options="{'mode': 'json'}" 
+                                           placeholder='{"header": {"parameter": "Value"}, "body": {"placeholders": ["Value1", "Value2"]}}'/>
+                                </group>
+                            </page>
+                            
+                            <page string="Flow">
+                                <group>
+                                    <field name="flow_id" domain="[('status', '=', 'published')]"/>
+                                    <field name="body_text" placeholder="Flow introduction message..."/>
+                                    <field name="flow_cta" placeholder="Button text (e.g., 'Get Started')"/>
+                                    <field name="flow_screen" placeholder="Initial screen name"/>
+                                    <field name="flow_data" widget="ace" options="{'mode': 'json'}" 
+                                           placeholder='{"key1": "value1", "key2": "value2"}'/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <footer>
+                        <button string="Send Message" name="send_message" type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+    </data>
+</odoo>

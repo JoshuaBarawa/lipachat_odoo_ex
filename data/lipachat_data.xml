@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Default Configuration -->
+        <record id="default_lipachat_config" model="lipachat.config">
+            <field name="name">LipaChat Gateway</field>
+            <field name="api_base_url">https://gateway.lipachat.com/api/v1</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

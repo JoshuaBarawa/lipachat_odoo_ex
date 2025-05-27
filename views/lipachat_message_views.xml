@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Message Form View -->
+        <record id="view_lipachat_message_form" model="ir.ui.view">
+            <field name="name">lipachat.message.form</field>
+            <field name="model">lipachat.message</field>
+            <field name="arch" type="xml">
+                <form string="WhatsApp Message">
+                    <header>
+                        <button name="send_message" string="Send Message" type="object" class="btn-primary"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="partner_id"/>
+                                <field name="phone_number"/>
+                                <field name="from_number"/>
+                                <field name="message_type"/>
+                            </group>
+                            <group>
+                                <field name="message_id"/>
+                                <field name="create_date"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Message Content">
+                                <group>
+                                    <field name="message_text" nolabel="1" placeholder="Enter your message text"/>
+                                </group>
+                                <group string="Media Message">
+                                    <field name="media_type"/>
+                                    <field name="media_url"/>
+                                    <field name="caption"/>
+                                </group>
+                                <group string="Interactive Content">
+                                    <field name="header_text"/>
+                                    <field name="body_text"/>
+                                    <field name="button_text"/>
+                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" nolabel="1"/>
+                                </group>
+                                <group string="Template Message">
+                                    <field name="template_name"/>
+                                    <field name="template_language"/>
+                                    <field name="template_data" widget="ace" options="{'mode': 'json'}"/>
+                                </group>
+                                <group string="WhatsApp Flow">
+                                    <field name="flow_id"/>
+                                    <field name="flow_cta"/>
+                                    <field name="flow_screen"/>
+                                    <field name="flow_data" widget="ace" options="{'mode': 'json'}"/>
+                                </group>
+                            </page>
+
+                            <page string="Response Details">
+                                <group>
+                                    <field name="error_message"/>
+                                    <field name="response_data" widget="ace" options="{'mode': 'json'}" readonly="1"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Message Tree View -->
+        <record id="view_lipachat_message_tree" model="ir.ui.view">
+            <field name="name">lipachat.message.tree</field>
+            <field name="model">lipachat.message</field>
+            <field name="arch" type="xml">
+                <tree string="WhatsApp Messages" decoration-success="state=='sent'" decoration-danger="state=='failed'">
+                    <field name="create_date"/>
+                    <field name="partner_id"/>
+                    <field name="phone_number"/>
+                    <field name="message_type"/>
+                    <field name="message_text" string="Content"/>
+                    <field name="state"/>
+                </tree>
+            </field>
+        </record>
+
+        <!-- Message Action -->
+        <record id="action_lipachat_message" model="ir.actions.act_window">
+            <field name="name">WhatsApp Messages</field>
+            <field name="res_model">lipachat.message</field>
+            <field name="view_mode">tree,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No WhatsApp messages yet
+                </p>
+                <p>
+                    Send your first WhatsApp message from a contact or create one here.
+                </p>
+            </field>
+        </record>
+    </data>
+</odoo>
+

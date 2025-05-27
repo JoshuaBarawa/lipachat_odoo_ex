@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Main Menu -->
+        <menuitem id="menu_lipachat_main" 
+                  name="LipaChat" 
+                  web_icon="lipachat_whatsapp,static/description/icon.png"
+                  sequence="100"/>
+
+        <!-- Messages Menu -->
+        <menuitem id="menu_lipachat_messages" 
+                  name="Messages" 
+                  parent="menu_lipachat_main" 
+                  action="action_lipachat_message" 
+                  sequence="10"/>
+
+        <!-- Templates Menu -->
+        <menuitem id="menu_lipachat_templates" 
+                  name="Templates" 
+                  parent="menu_lipachat_main" 
+                  action="action_lipachat_template" 
+                  sequence="20"/>
+
+        <!-- Flows Menu -->
+        <menuitem id="menu_lipachat_flows" 
+                  name="Flows" 
+                  parent="menu_lipachat_main" 
+                  action="action_lipachat_flow" 
+                  sequence="30"/>
+
+        <!-- Configuration Menu -->
+        <menuitem id="menu_lipachat_config" 
+                  name="Configuration" 
+                  parent="menu_lipachat_main" 
+                  action="action_lipachat_config" 
+                  sequence="90"
+                  groups="base.group_system"/>
+    </data>
+</odoo>
