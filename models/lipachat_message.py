@@ -23,6 +23,10 @@ class LipachatMessage(models.Model):
     )
     phone_number = fields.Char('Phone Number')
     
+    # Add field to track if this is a bulk message template
+    is_bulk_template = fields.Boolean('Is Bulk Template', default=False)
+    bulk_parent_id = fields.Many2one('lipachat.message', 'Bulk Parent Message')
+    
     config_id = fields.Many2one(
         'lipachat.config',
         string='LipaChat Configuration',
@@ -107,24 +111,19 @@ class LipachatMessage(models.Model):
             cleaned = cleaned[1:]
         return cleaned
 
-
     def send_message(self):
         """Send WhatsApp message via LipaChat API to one or multiple contacts"""
         config = self.config_id
         if not config:
             raise ValidationError(_("Please select a valid LipaChat configuration."))
 
-        headers = {
-            'apiKey': config.api_key,
-            'Content-Type': 'application/json'
-        }
-        
         # Determine recipients
         recipients = []
         if self.phone_number:
             recipients.append({
                 'phone': self._clean_phone_number(self.phone_number),
-                'name': self.partner_id.name if self.partner_id else self.phone_number
+                'name': self.partner_id.name if self.partner_id else self.phone_number,
+                'partner_id': self.partner_id.id if self.partner_id else False
             })
         if self.partner_ids:
             for partner in self.partner_ids:
@@ -132,44 +131,101 @@ class LipachatMessage(models.Model):
                 if phone:
                     recipients.append({
                         'phone': self._clean_phone_number(phone),
-                        'name': partner.name
+                        'name': partner.name,
+                        'partner_id': partner.id
                     })
         
         if not recipients:
             raise ValidationError(_("No valid recipients found. Please check phone numbers."))
         
-        success_count = 0
-        failed_contacts = []
-        sent_contacts = []
+        # If multiple recipients, create individual message records
+        if len(recipients) > 1:
+            return self._send_bulk_messages(recipients, config)
+        else:
+            # Single recipient - send directly
+            return self._send_single_message(recipients[0], config)
+
+    def _send_bulk_messages(self, recipients, config):
+        """Create individual message records for each recipient and send them"""
+        # Mark current record as bulk template
+        self.is_bulk_template = True
+        self.state = 'draft'  # Keep template as draft
+        
+        individual_messages = []
         
         for recipient in recipients:
-            try:
-                send_method = getattr(self, f'_send_{self.message_type}_message')
-                if send_method(config, headers, recipient):
-                    success_count += 1
-                    sent_contacts.append(f"{recipient['name']} ({recipient['phone']})")
-                else:
-                    failed_contacts.append(f"{recipient['name']} ({recipient['phone']}): Unexpected status")
-            except Exception as e:
-                _logger.error(f"Failed to send to {recipient['phone']}: {str(e)}")
-                failed_contacts.append(f"{recipient['name']} ({recipient['phone']}): {str(e)}")
+            # Create individual message record
+            individual_msg = self.copy({
+                'partner_id': recipient['partner_id'],
+                'partner_ids': [(5, 0, 0)],  # Clear many2many field
+                'phone_number': recipient['phone'],
+                'is_bulk_template': False,
+                'bulk_parent_id': self.id,
+                'message_id': str(uuid.uuid4()),  # New unique ID
+            })
+            individual_messages.append(individual_msg)
         
-        # Update message status based on results
-        if success_count == len(recipients):
+        # Send each individual message
+        success_count = 0
+        for msg in individual_messages:
+            try:
+                recipient = {
+                    'phone': msg.phone_number,
+                    'name': msg.partner_id.name if msg.partner_id else msg.phone_number,
+                    'partner_id': msg.partner_id.id if msg.partner_id else False
+                }
+                if msg._send_single_message(recipient, config):
+                    success_count += 1
+            except Exception as e:
+                _logger.error(f"Failed to send individual message {msg.id}: {str(e)}")
+        
+        # Update bulk template status
+        total_messages = len(individual_messages)
+        if success_count == total_messages:
             self.state = 'sent'
         elif success_count == 0:
             self.state = 'failed'
         else:
             self.state = 'partially_sent'
         
+        # Update summary fields on template
+        sent_contacts = [msg.partner_id.name or msg.phone_number for msg in individual_messages if msg.state == 'sent']
+        failed_contacts = [f"{msg.partner_id.name or msg.phone_number}: {msg.error_message}" for msg in individual_messages if msg.state == 'failed']
+        
         self.sent_contacts = ', '.join(sent_contacts) if sent_contacts else ''
         self.failed_contacts = '\n'.join(failed_contacts) if failed_contacts else ''
+        
+        return True
 
+    def _send_single_message(self, recipient, config):
+        """Send message to a single recipient"""
+        headers = {
+            'apiKey': config.api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            send_method = getattr(self, f'_send_{self.message_type}_message')
+            if send_method(config, headers, recipient):
+                self.state = 'sent'
+                self.sent_contacts = f"{recipient['name']} ({recipient['phone']})"
+                return True
+            else:
+                self.state = 'failed'
+                self.error_message = "Unexpected API response status"
+                self.failed_contacts = f"{recipient['name']} ({recipient['phone']}): Unexpected status"
+                return False
+        except Exception as e:
+            _logger.error(f"Failed to send to {recipient['phone']}: {str(e)}")
+            self.state = 'failed'
+            self.error_message = str(e)
+            self.failed_contacts = f"{recipient['name']} ({recipient['phone']}): {str(e)}"
+            return False
     
     def _send_text_message(self, config, headers, recipient):
         data = {
             "message": self.message_text,
-            "messageId": str(uuid.uuid4()),  # New ID for each recipient
+            "messageId": self.message_id,
             "to": recipient['phone'],
             "from": self.from_number or config.default_from_number
         }
@@ -185,7 +241,7 @@ class LipachatMessage(models.Model):
     
     def _send_media_message(self, config, headers, recipient):
         data = {
-            "messageId": str(uuid.uuid4()),
+            "messageId": self.message_id,
             "to": recipient['phone'],
             "from": self.from_number or config.default_from_number,
             "mediaType": self.media_type,
@@ -208,7 +264,7 @@ class LipachatMessage(models.Model):
         data = {
             "text": self.body_text,
             "buttons": buttons_data,
-            "messageId": str(uuid.uuid4()),
+            "messageId": self.message_id,
             "to": recipient['phone'],
             "from": self.from_number or config.default_from_number
         }
@@ -230,7 +286,7 @@ class LipachatMessage(models.Model):
             "body": self.body_text,
             "buttonText": self.button_text,
             "buttons": buttons_data,
-            "messageId": str(uuid.uuid4()),
+            "messageId": self.message_id,
             "to": recipient['phone'],
             "from": self.from_number or config.default_from_number
         }
@@ -248,7 +304,7 @@ class LipachatMessage(models.Model):
         template_data = json.loads(self.template_data) if self.template_data else {}
         
         data = {
-            "messageId": str(uuid.uuid4()),
+            "messageId": self.message_id,
             "to": recipient['phone'],
             "from": self.from_number or config.default_from_number,
             "template": {

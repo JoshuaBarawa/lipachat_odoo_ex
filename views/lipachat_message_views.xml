@@ -30,6 +30,15 @@
                     border-bottom: 1px solid #e9ecef;
                     padding-bottom: 15px;
                 }
+                /* Style for bulk template indicator */
+                .bulk-template-indicator {
+                    background: #fff3cd;
+                    border: 1px solid #ffeeba;
+                    color: #856404;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    margin-bottom: 10px;
+                }
             </style>
         </template>
 
@@ -40,27 +49,42 @@
             <field name="arch" type="xml">
                 <form string="WhatsApp Message" class="lipachat-message-form">
                     <header>
-                        <button name="send_message" string="Send Message" type="object" class="btn-primary"/>
+                        <button name="send_message" string="Send Message" type="object" class="btn-primary" 
+                                invisible="state != 'draft'"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
+                        <!-- Bulk template indicator -->
+                        <div class="bulk-template-indicator" invisible="not is_bulk_template">
+                            <strong>Bulk Message Template:</strong> This message was sent to multiple recipients. 
+                            Individual message records were created for each recipient.
+                        </div>
+                        
+                        <!-- Individual message indicator -->
+                        <div class="alert alert-info" invisible="not bulk_parent_id">
+                            <strong>Individual Message:</strong> This is part of a bulk message. 
+                            <field name="bulk_parent_id" readonly="1" string="View bulk template"/>
+                        </div>
+
                         <div class="recipient-selection">
                             <h2>Recipients</h2>
                             <group>
                                 <group>
                                     <field name="partner_ids" widget="many2many_tags" 
                                         placeholder="Select multiple contacts..."
-                                        options="{'no_create': True}"/>
+                                        options="{'no_create': True}"
+                                        readonly="state != 'draft'"/>
                                 </group>
                                 <group>
                                     <label for="phone_number" string="Or specify phone number"/>
                                     <div class="o_row">
                                         <field name="partner_id" options="{'no_create': True}" 
-                                            invisible="partner_ids" placeholder="Select contact"/>
+                                            invisible="partner_ids" placeholder="Select contact"
+                                            readonly="state != 'draft'"/>
                                         <field name="phone_number" 
-                                            invisible="partner_ids" placeholder="Enter phone number"/>
+                                            invisible="partner_ids" placeholder="Enter phone number"
+                                            readonly="state != 'draft'"/>
                                     </div>
-
                                 </group>
                             </group>
                         </div>
@@ -68,14 +92,16 @@
                         <group>
                             <group>
                                 <!-- New config selection -->
-                                <field name="config_id" domain="[('active', '=', True)]" />
+                                <field name="config_id" domain="[('active', '=', True)]" 
+                                       readonly="state != 'draft'"/>
                                 <!-- from_number is now readonly and related to config -->
                                 <field name="from_number" readonly="1"/>
-                                <field name="message_type"/>
+                                <field name="message_type" readonly="state != 'draft'"/>
                             </group>
                             <group>
                                 <field name="message_id"/>
                                 <field name="create_date"/>
+                                <field name="is_bulk_template" invisible="1"/>
                             </group>
                         </group>
 
@@ -83,23 +109,26 @@
                             <page string="Message Content">
                                 <!-- Main message text - full width, no group wrapper -->
                                 <div class="o_group" style="width: 100%; max-width: 100%;">
-                                    <field name="message_text" nolabel="1" placeholder="Enter your message text" style="width: 100%; max-width: 100%;"/>
+                                    <field name="message_text" nolabel="1" placeholder="Enter your message text" 
+                                           style="width: 100%; max-width: 100%;" readonly="state != 'draft'"/>
                                 </div>
                                 <group string="Media Message">
-                                    <field name="media_type"/>
-                                    <field name="media_url"/>
-                                    <field name="caption"/>
+                                    <field name="media_type" readonly="state != 'draft'"/>
+                                    <field name="media_url" readonly="state != 'draft'"/>
+                                    <field name="caption" readonly="state != 'draft'"/>
                                 </group>
                                 <group string="Interactive Content">
-                                    <field name="header_text"/>
-                                    <field name="body_text"/>
-                                    <field name="button_text"/>
-                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" nolabel="1"/>
+                                    <field name="header_text" readonly="state != 'draft'"/>
+                                    <field name="body_text" readonly="state != 'draft'"/>
+                                    <field name="button_text" readonly="state != 'draft'"/>
+                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" 
+                                           nolabel="1" readonly="state != 'draft'"/>
                                 </group>
                                 <group string="Template Message">
-                                    <field name="template_name"/>
-                                    <field name="template_language"/>
-                                    <field name="template_data" widget="ace" options="{'mode': 'json'}"/>
+                                    <field name="template_name" readonly="state != 'draft'"/>
+                                    <field name="template_language" readonly="state != 'draft'"/>
+                                    <field name="template_data" widget="ace" options="{'mode': 'json'}" 
+                                           readonly="state != 'draft'"/>
                                 </group>
                             </page>
 
@@ -117,28 +146,99 @@
             </field>
         </record>
 
-        <!-- Message Tree View (updated) -->
+        <!-- Message Tree View (updated to show individual messages) -->
         <record id="view_lipachat_message_tree" model="ir.ui.view">
             <field name="name">lipachat.message.tree</field>
             <field name="model">lipachat.message</field>
             <field name="arch" type="xml">
-                <tree string="WhatsApp Messages" decoration-success="state=='sent'" decoration-danger="state=='failed'" decoration-warning="state=='partially_sent'">
+                <tree string="WhatsApp Messages" 
+                      decoration-success="state=='sent'" 
+                      decoration-danger="state=='failed'" 
+                      decoration-warning="state=='partially_sent'"
+                      decoration-muted="is_bulk_template">
                     <field name="create_date"/>
-                    <field name="partner_id" invisible="1"/>
-                    <field name="partner_ids" widget="many2many_tags"/>
+                    <field name="partner_id"/>
                     <field name="phone_number"/>
                     <field name="message_type"/>
                     <field name="message_text" string="Content"/>
                     <field name="state"/>
+                    <field name="bulk_parent_id" invisible="1"/>
+                    <field name="is_bulk_template" invisible="1"/>
                 </tree>
             </field>
         </record>
 
-        <!-- Message Action (unchanged) -->
+        <!-- Search View with filters -->
+        <record id="view_lipachat_message_search" model="ir.ui.view">
+            <field name="name">lipachat.message.search</field>
+            <field name="model">lipachat.message</field>
+            <field name="arch" type="xml">
+                <search string="WhatsApp Messages">
+                    <field name="partner_id"/>
+                    <field name="phone_number"/>
+                    <field name="message_text"/>
+                    <field name="state"/>
+                    
+                    <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                    <filter string="Sent" name="sent" domain="[('state', '=', 'sent')]"/>
+                    <filter string="Failed" name="failed" domain="[('state', '=', 'failed')]"/>
+                    
+                    <separator/>
+                    <filter string="Today" name="today" 
+                            domain="[('create_date', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
+                    <filter string="This Week" name="this_week" 
+                            domain="[('create_date', '>=', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                    
+                    <group expand="0" string="Group By">
+                        <filter string="Status" name="group_status" context="{'group_by': 'state'}"/>
+                        <filter string="Message Type" name="group_type" context="{'group_by': 'message_type'}"/>
+                        <filter string="Contact" name="group_contact" context="{'group_by': 'partner_id'}"/>
+                        <filter string="Date" name="group_date" context="{'group_by': 'create_date:day'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Individual Messages Action -->
+        <record id="action_lipachat_message_individual" model="ir.actions.act_window">
+            <field name="name">Individual WhatsApp Messages</field>
+            <field name="res_model">lipachat.message</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('is_bulk_template', '=', False)]</field>
+            <field name="context">{'default_is_bulk_template': False}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No individual WhatsApp messages yet
+                </p>
+                <p>
+                    Individual message records are created automatically when you send bulk messages.
+                </p>
+            </field>
+        </record>
+
+        <!-- Bulk Templates Action -->
+        <record id="action_lipachat_message_bulk" model="ir.actions.act_window">
+            <field name="name">Bulk Message Templates</field>
+            <field name="res_model">lipachat.message</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('is_bulk_template', '=', True)]</field>
+            <field name="context">{'default_is_bulk_template': True}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No bulk message templates yet
+                </p>
+                <p>
+                    Bulk templates are created when you send messages to multiple recipients.
+                </p>
+            </field>
+        </record>
+
+        <!-- Main Message Action (shows all) -->
         <record id="action_lipachat_message" model="ir.actions.act_window">
             <field name="name">WhatsApp Messages</field>
             <field name="res_model">lipachat.message</field>
             <field name="view_mode">tree,form</field>
+            <field name="search_view_id" ref="view_lipachat_message_search"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     No WhatsApp messages yet
