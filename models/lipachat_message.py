@@ -90,7 +90,12 @@ class LipachatMessage(models.Model):
             if not record.partner_id and not record.partner_ids and not record.phone_number:
                 raise ValidationError(_("You must specify at least one recipient (contact or phone number)"))
             
-    
+    @api.constrains('message_type', 'message_text')
+    def _check_message_content(self):
+        for record in self:
+            if record.message_type == 'text' and not record.message_text:
+                raise ValidationError(_("Message text is required for text messages"))
+            
     def _clean_phone_number(self, phone):
         """Remove all non-digit characters from phone number"""
         if not phone:
