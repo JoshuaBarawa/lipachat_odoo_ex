@@ -16,7 +16,13 @@
                             <group>
                                 <field name="partner_id"/>
                                 <field name="phone_number"/>
-                                <field name="from_number"/>
+
+                                <!-- New config selection -->
+                                <field name="config_id" domain="[('active', '=', True)]" />
+
+                                <!-- from_number is now readonly and related to config -->
+                                <field name="from_number" readonly="1"/>
+
                                 <field name="message_type"/>
                             </group>
                             <group>
@@ -60,7 +66,7 @@
             </field>
         </record>
 
-        <!-- Message Tree View -->
+        <!-- Message Tree View (unchanged) -->
         <record id="view_lipachat_message_tree" model="ir.ui.view">
             <field name="name">lipachat.message.tree</field>
             <field name="model">lipachat.message</field>
@@ -76,7 +82,7 @@
             </field>
         </record>
 
-        <!-- Message Action -->
+        <!-- Message Action (unchanged) -->
         <record id="action_lipachat_message" model="ir.actions.act_window">
             <field name="name">WhatsApp Messages</field>
             <field name="res_model">lipachat.message</field>
@@ -92,4 +98,3 @@
         </record>
     </data>
 </odoo>
-
