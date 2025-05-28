@@ -40,6 +40,7 @@
         'views/lipachat_message_views.xml',
         'views/lipachat_template_views.xml',
         'views/res_partner_views.xml',
+        'views/lipachat_whatsapp_chat.xml',
         'views/lipachat_menus.xml',
         'wizard/send_whatsapp_wizard_views.xml',
     ],
@@ -52,7 +53,6 @@
     },
     'assets': {
     'web.assets_backend': [
-        'lipachat_whatsapp/static/src/scss/lipachat_styles.scss',
     ],
    },
 }

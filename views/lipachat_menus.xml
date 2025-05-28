@@ -7,26 +7,33 @@
                   web_icon="lipachat_whatsapp,static/description/icon.png"
                   sequence="100"/>
 
+         <!-- Configuration Menu -->
+        <menuitem id="menu_lipachat_config" 
+                  name="Configuration" 
+                  parent="menu_lipachat_main" 
+                  action="action_lipachat_config" 
+                  sequence="10"
+                  groups="base.group_system"/>
+
         <!-- Messages Menu -->
         <menuitem id="menu_lipachat_messages" 
                   name="Messages" 
                   parent="menu_lipachat_main" 
                   action="action_lipachat_message" 
-                  sequence="10"/>
+                  sequence="20"/>
 
         <!-- Templates Menu -->
         <menuitem id="menu_lipachat_templates" 
                   name="Templates" 
                   parent="menu_lipachat_main" 
                   action="action_lipachat_template" 
-                  sequence="20"/>
+                  sequence="30"/>
 
-        <!-- Configuration Menu -->
-        <menuitem id="menu_lipachat_config" 
-                  name="Configuration" 
-                  parent="menu_lipachat_main" 
-                  action="action_lipachat_config" 
-                  sequence="90"
-                  groups="base.group_system"/>
+        <!-- Menu Item -->
+        <menuitem id="menu_whatsapp_chat_interface"
+          name="Chat Interface"
+          parent="menu_lipachat_main"
+          action="action_whatsapp_chat"
+          sequence="40"/>
     </data>
 </odoo>

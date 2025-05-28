@@ -1,0 +1,63 @@
+<odoo>
+    <data>
+
+        <!-- Action opening as a separate page -->
+        <record id="action_whatsapp_chat" model="ir.actions.act_window">
+            <field name="name">Chat Interface</field>
+            <field name="res_model">whatsapp.chat</field>
+            <field name="view_mode">form</field>
+            <!-- remove target or set to 'current' -->
+            <field name="target">current</field>
+        </record>
+
+        <!-- Form View -->
+        <record id="view_whatsapp_chat_form" model="ir.ui.view">
+            <field name="name">whatsapp.chat.form</field>
+            <field name="model">whatsapp.chat</field>
+            <field name="arch" type="xml">
+                <form string="Chat Interface" create="false" edit="false" delete="false" class="oe_chatter" >
+                    <sheet>
+                        <div style="display: flex; height: 600px; border: 1px solid #ccc;">
+
+                            <!-- Left: Mock Contacts -->
+                            <div style="width: 300px; border-right: 1px solid #ddd; padding: 10px; overflow-y: auto;">
+                                <h3 style="margin-top: 0;">Contacts</h3>
+                                <ul style="list-style: none; padding: 0; margin: 0;">
+                                    <li style="padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                        <strong>John Doe</strong><br/>
+                                        <small>Last message preview...</small>
+                                    </li>
+                                    <li style="padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                        <strong>Jane Smith</strong><br/>
+                                        <small>Typing...</small>
+                                    </li>
+                                    <li style="padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <!-- Add more mock contacts as needed -->
+                                </ul>
+                            </div>
+
+                            <!-- Right: Chat Area -->
+                            <div style="flex-grow: 1; padding: 10px; display: flex; flex-direction: column;">
+
+                                <div style="flex-grow: 1; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fafafa; white-space: pre-wrap;">
+                                    <!-- This should be your messages field -->
+                                    <field name="messages" widget="text" readonly="1" />
+                                </div>
+
+                                <div style="margin-top: 10px; display: flex;">
+                                    <field name="new_message" placeholder="Type your message..." style="flex-grow: 1;"/>
+                                    <button name="send_message" type="object" string="Send" class="btn-primary" style="margin-left: 10px;"/>
+                                </div>
+                            </div>
+
+                        </div>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>
