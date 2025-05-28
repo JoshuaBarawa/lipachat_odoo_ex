@@ -15,47 +15,48 @@
             <field name="name">whatsapp.chat.form</field>
             <field name="model">whatsapp.chat</field>
             <field name="arch" type="xml">
-                <form string="Chat Interface" create="false" edit="false" delete="false" class="oe_chatter" >
+               <form string="Chat Interface" create="false" edit="false" delete="false" class="oe_chatter" >
                     <sheet>
-                        <div style="display: flex; height: 600px; border: 1px solid #ccc;">
+                        <div class="chat-container">
 
                             <!-- Left: Mock Contacts -->
-                            <div style="width: 300px; border-right: 1px solid #ddd; padding: 10px; overflow-y: auto;">
-                                <h3 style="margin-top: 0;">Contacts</h3>
-                                <ul style="list-style: none; padding: 0; margin: 0;">
-                                    <li style="padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+                            <div class="chat-contacts">
+                                <h3>Contacts</h3>
+                                <ul>
+                                    <li>
                                         <strong>John Doe</strong><br/>
                                         <small>Last message preview...</small>
                                     </li>
-                                    <li style="padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                    <li>
                                         <strong>Jane Smith</strong><br/>
                                         <small>Typing...</small>
                                     </li>
-                                    <li style="padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                    <li>
                                         <strong>Mark Wilson</strong><br/>
                                         <small>Sent a photo</small>
                                     </li>
-                                    <!-- Add more mock contacts as needed -->
                                 </ul>
                             </div>
 
                             <!-- Right: Chat Area -->
-                            <div style="flex-grow: 1; padding: 10px; display: flex; flex-direction: column;">
+                            <div class="chat-area">
 
-                                <div style="flex-grow: 1; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fafafa; white-space: pre-wrap;">
-                                    <!-- This should be your messages field -->
+                                <div class="chat-messages">
                                     <field name="messages" widget="text" readonly="1" />
                                 </div>
 
-                                <div style="margin-top: 10px; display: flex;">
-                                    <field name="new_message" placeholder="Type your message..." style="flex-grow: 1;"/>
-                                    <button name="send_message" type="object" string="Send" class="btn-primary" style="margin-left: 10px;"/>
+                                <div class="chat-input-container">
+                                    <!-- Use textarea for multi-line input -->
+                                    <field name="new_message" placeholder="Type your message..." />
+                                    <button name="send_message" type="object" string="Send"/>
                                 </div>
+
                             </div>
 
                         </div>
                     </sheet>
                 </form>
+
             </field>
         </record>
 

@@ -53,6 +53,7 @@
     },
     'assets': {
     'web.assets_backend': [
+        'lipachat_odoo_ex/static/src/css/chat_interface.css',
     ],
    },
 }
