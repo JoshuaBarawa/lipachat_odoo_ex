@@ -21,7 +21,7 @@
 
                             <!-- Left: Mock Contacts -->
                             <div class="chat-contacts">
-                                <h3>Contacts</h3>
+                                  <h3>Contacts</h3>
                                 <ul>
                                     <li>
                                         <strong>John Doe</strong><br/>
@@ -35,6 +35,70 @@
                                         <strong>Mark Wilson</strong><br/>
                                         <small>Sent a photo</small>
                                     </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
+                                    <li>
+                                        <strong>Mark Wilson</strong><br/>
+                                        <small>Sent a photo</small>
+                                    </li>
                                 </ul>
                             </div>
 
@@ -42,7 +106,7 @@
                             <div class="chat-area">
 
                                <div class="chat-partner-info">
-                                    <div class="chat-partner-avatar">JD<div class="online-dot"></div></div>
+                                    <div class="chat-partner-avatar">JD</div>
                                     <p>John Doe</p>
                                 </div>
 

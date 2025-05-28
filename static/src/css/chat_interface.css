@@ -17,6 +17,7 @@
     border-right: 1px solid #e9ecef;
     display: flex;
     flex-direction: column;
+    overflow-y: scroll !important;
 }
 
 .chat-contacts h3 {
@@ -25,6 +26,8 @@
     padding: 15px;
     font-weight: 500;
     font-size: 18px;
+    position: sticky !important;
+    top: 0 !important;
 }
 
 .chat-contacts ul {
