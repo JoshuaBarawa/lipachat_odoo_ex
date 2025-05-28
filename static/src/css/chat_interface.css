@@ -59,8 +59,36 @@
     padding: 0px;
     display: flex;
     flex-direction: column;
-    background-color: #ffffff;
-    
+    background-color: #ffffff;  
+}
+
+.chat-partner-info{
+    background: #f0f2f5;
+    padding: 10px 16px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+}
+
+.chat-partner-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #dfe5e7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #54656f;
+    font-weight: 500;
+    margin-right: 12px;
+    position: relative;
+}
+
+.chat-partner-info h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #111b21;
+    font-weight: 500;
 }
 
 /* Messages area */

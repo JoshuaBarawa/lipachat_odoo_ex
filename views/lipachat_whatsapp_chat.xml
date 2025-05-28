@@ -41,6 +41,11 @@
                             <!-- Right: Chat Area -->
                             <div class="chat-area">
 
+                               <div class="chat-partner-info">
+                                    <div class="chat-partner-avatar">JD<div class="online-dot"></div></div>
+                                    <p>John Doe</p>
+                                </div>
+
                                 <div class="chat-messages">
                                     <field name="messages" widget="text" readonly="1" />
                                 </div>
