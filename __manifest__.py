@@ -1,6 +1,6 @@
 {
     'name': 'LipaChat WhatsApp Gateway',
-    'version': '1.0.0',
+    'version': '17.0.1.0.0',
     'category': 'Communication',
     'summary': 'Send WhatsApp messages through LipaChat Gateway',
     'description': '''
@@ -32,7 +32,7 @@
     'author': 'LipaChat Gateway',
     'website': 'https://lipachat.com',
     'license': 'LGPL-3',
-    'depends': ['base', 'mail', 'contacts'],
+    'depends': ['base', 'mail', 'contacts', 'web'],
     'data': [
         'security/ir.model.access.csv',
         'data/lipachat_data.xml',
@@ -54,6 +54,7 @@
     'assets': {
     'web.assets_backend': [
         'lipachat_odoo_ex/static/src/css/chat_interface.css',
+        'lipachat_odoo_ex/static/src/js/whatsapp_chat_client.js',
     ],
    },
 }
