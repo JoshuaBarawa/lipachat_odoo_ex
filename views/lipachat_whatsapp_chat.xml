@@ -30,10 +30,10 @@
                                     <field name="messages_html" widget="html" nolabel="1" class="o_whatsapp_messages_html"/>
                                 </div>
                                 <div class="chat-input-container">
-                                    <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/>
-                                    <button name="send_message_button_js" type="button" class="btn btn-primary o_whatsapp_send_button" aria-label="Send Message">
+                                    <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/>   
+                                 <div class="btn btn-primary o_whatsapp_send_button" role="button" tabindex="0" aria-label="Send Message" style="cursor: pointer;">
                                         <i class="fa fa-paper-plane"/>
-                                    </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

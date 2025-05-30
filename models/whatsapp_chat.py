@@ -471,3 +471,4 @@ class WhatsappChat(models.TransientModel):
                 '''
         html += '</div>'
         return html
+    
