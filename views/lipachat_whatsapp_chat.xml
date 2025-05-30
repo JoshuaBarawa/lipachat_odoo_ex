@@ -6,16 +6,10 @@
             <field name="model">whatsapp.chat</field>
             <field name="arch" type="xml">
                 <form string="WhatsApp Chat Interface" create="false" edit="false" delete="false">
-                    <header>
-                        <button name="refresh_chat" type="object" string="Refresh All" class="oe_highlight refresh-button"/>
-                    </header>
                     <sheet>
                         <div class="chat-container">
                             <div class="chat-contacts">
-                                <h3>
-                                    Conversations
-                                    <span class="badge rounded-pill bg-success" id="contacts-count">0</span>
-                                </h3>
+                                <h3>Conversations</h3>
                                 <field name="contacts_html" widget="html" nolabel="1" class="o_whatsapp_contacts_html"/>
                             </div>
                             <div class="chat-area">

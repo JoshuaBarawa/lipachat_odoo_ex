@@ -340,29 +340,6 @@ class WhatsappChat(models.TransientModel):
                 }
             }
 
-    def refresh_chat(self):
-        """
-        Action method to explicitly refresh the chat interface.
-        This will still cause a full reload of the form, but it's only for the manual button.
-        The automatic selection and sending should NOT use this.
-        """
-        self.ensure_one()
-        _logger.info("Manual refresh_chat method called.")
-        self.last_refresh = fields.Datetime.now()
-        
-        # Keep the reload for the explicit button click
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'reload',
-            'params': {
-                'notification': {
-                    'title': 'Refreshed',
-                    'message': 'Chat interface updated',
-                    'type': 'info'
-                }
-            }
-        }
-
     @api.model
     def rpc_get_messages_html(self, partner_id):
         """
