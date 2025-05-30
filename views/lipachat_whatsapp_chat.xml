@@ -31,9 +31,9 @@
                                 </div>
                                 <div class="chat-input-container">
                                     <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/>   
-                                 <div class="btn btn-primary o_whatsapp_send_button" role="button" tabindex="0" aria-label="Send Message" style="cursor: pointer;">
+                                    <button name="send_message" type="object" string="Send" class="btn btn-primary o_whatsapp_send_button">
                                         <i class="fa fa-paper-plane"/>
-                                    </div>
+                                    </button>
                                 </div>
                             </div>
                         </div>
