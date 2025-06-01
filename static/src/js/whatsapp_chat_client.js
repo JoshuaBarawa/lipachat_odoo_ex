@@ -12,6 +12,21 @@
             this.autoRefreshInterval = null;
             this.lastMessageId = 0;
             this.isInitialized = false;
+            this.isSending = false; // Add this line
+            this.boundHandleSendClick = null; // Add this line
+            this.eventListeners = [];
+        }
+
+        addEventListener(element, event, handler) {
+            console.log(`Adding event listener: ${event} to`, element);
+            if (!element || !event || !handler) {
+                console.error('Invalid arguments for addEventListener', {element, event, handler});
+                return;
+            }
+            
+            element.addEventListener(event, handler);
+            this.eventListeners.push({ element, event, handler });
+            console.log(`Listener added. Total listeners: ${this.eventListeners.length}`);
         }
 
         // Helper function to get CSRF token
@@ -398,31 +413,32 @@
 
         // Enhanced message input handling
         setupMessageInput() {
+            // Find the message input
             const messageInput = this.findOdooField('new_message') || 
-                               document.querySelector('textarea[name="new_message"]') ||
-                               document.querySelector('.o_whatsapp_new_message textarea') ||
-                               document.querySelector('.o_whatsapp_new_message');
+                                document.querySelector('textarea[name="new_message"]') ||
+                                document.querySelector('.o_whatsapp_new_message textarea') ||
+                                document.querySelector('.o_whatsapp_new_message');
             
             if (messageInput) {
-                console.log('Setting up message input:', messageInput);
+                // Clone to remove existing listeners
+                const newMessageInput = messageInput.cloneNode(true);
+                messageInput.parentNode.replaceChild(newMessageInput, messageInput);
                 
-                // Handle Enter key (send message) and Shift+Enter (new line)
-                messageInput.addEventListener('keydown', (event) => {
+                // Add managed listeners
+                this.addEventListener(newMessageInput, 'keydown', (event) => {
                     if (event.key === 'Enter' && !event.shiftKey) {
                         event.preventDefault();
                         event.stopPropagation();
                         this.handleSendMessage();
                     }
                 });
-
-                // Auto-resize textarea
-                messageInput.addEventListener('input', () => {
-                    messageInput.style.height = 'auto';
-                    messageInput.style.height = messageInput.scrollHeight + 'px';
+        
+                this.addEventListener(newMessageInput, 'input', () => {
+                    newMessageInput.style.height = 'auto';
+                    newMessageInput.style.height = newMessageInput.scrollHeight + 'px';
                 });
-
-                // Prevent form submission on Enter
-                messageInput.addEventListener('keypress', (event) => {
+        
+                this.addEventListener(newMessageInput, 'keypress', (event) => {
                     if (event.key === 'Enter' && !event.shiftKey) {
                         event.preventDefault();
                         event.stopPropagation();
@@ -436,57 +452,74 @@
 
         // Handle send message with better error handling and UX
         async handleSendMessage() {
+
+            if (this.lastSendAttempt && (Date.now() - this.lastSendAttempt < 1000)) {
+                console.log('Send message throttled');
+                return;
+            }
+            this.lastSendAttempt = Date.now();
+
+
+            // Check if already sending
+            if (this.isSending) {
+                console.log('Message sending already in progress');
+                return;
+            }
+            
+            this.isSending = true;
+            
             try {
                 // Get the message text directly from the input field
                 const messageInput = document.querySelector('textarea[name="new_message"]') ||
-                                   document.querySelector('.o_whatsapp_new_message textarea') ||
-                                   document.querySelector('.o_whatsapp_new_message') ||
-                                   this.findOdooField('new_message');
+                                document.querySelector('.o_whatsapp_new_message textarea') ||
+                                document.querySelector('.o_whatsapp_new_message') ||
+                                this.findOdooField('new_message');
                 
                 if (!messageInput) {
                     console.error("Message input element not found!");
                     return;
                 }
-        
+
                 const messageText = messageInput.value.trim();
                 
                 if (!this.currentSelectedPartnerId) {
                     this.showChatError('Please select a contact first');
                     return;
                 }
-        
+
                 if (!messageText) {
                     this.showChatError('Please enter a message');
                     return;
                 }
-        
+
                 this.showSendingStatus(true);
-        
+
                 // Call the dedicated RPC method
                 const result = await this.makeRpcCall(
                     'whatsapp.chat',
                     'rpc_send_message',
                     [parseInt(this.currentSelectedPartnerId), messageText]
                 );
-        
+
                 // Clear the input on success
                 messageInput.value = '';
                 messageInput.dispatchEvent(new Event('change', { bubbles: true }));
                 messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-        
+
                 // Refresh the chat
                 await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
-        
+
                 // Show success message
                 if (result && result.status === 'success') {
                     this.showChatSuccess(result.message);
                 }
-        
+
             } catch (error) {
                 console.error("Error sending message:", error);
                 this.showChatError(error.message || 'Failed to send message');
             } finally {
                 this.showSendingStatus(false);
+                this.isSending = false;
             }
         }
 
@@ -576,109 +609,121 @@
         // Main initialization function
         async initialize() {
 
-              // Verify all required methods exist
-                const requiredMethods = [
-                    'updateContactSelectionUI',
-                    'updateChatHeader',
-                    'updateOdooFields',
-                    'renderMessages'
-                ];
-                
-                requiredMethods.forEach(method => {
-                    if (typeof this[method] !== 'function') {
-                        console.error(`Missing required method: ${method}`);
-                        throw new Error(`WhatsAppChatClient missing required method: ${method}`);
-                    }
-                });
+            // Verify all required methods exist
+              const requiredMethods = [
+                  'updateContactSelectionUI',
+                  'updateChatHeader',
+                  'updateOdooFields',
+                  'renderMessages'
+              ];
+              
+              requiredMethods.forEach(method => {
+                  if (typeof this[method] !== 'function') {
+                      console.error(`Missing required method: ${method}`);
+                      throw new Error(`WhatsAppChatClient missing required method: ${method}`);
+                  }
+              });
 
 
-            if (this.isInitialized) {
-                console.log('WhatsApp Chat Client already initialized, skipping...');
-                return;
+          if (this.isInitialized) {
+              console.log('WhatsApp Chat Client already initialized, skipping...');
+              return;
+          }
+      
+          console.log("WhatsApp Chat Client JS Initializing...");
+      
+          // Wait for Odoo form to be fully ready
+          await this.waitForOdooForm();
+      
+          // Get initial selected contact from hidden fields if already set by Python
+          const initialPartnerIdField = this.findOdooField('contact_partner_id');
+          const initialContactNameField = this.findOdooField('contact');
+      
+          if (initialPartnerIdField && initialPartnerIdField.value) {
+              this.currentSelectedPartnerId = parseInt(initialPartnerIdField.value);
+              this.currentSelectedContactName = initialContactNameField ? initialContactNameField.value : '';
+              console.log('Found initial selection:', {
+                  partnerId: this.currentSelectedPartnerId,
+                  contactName: this.currentSelectedContactName
+              });
+              
+              // Ensure our client state matches Odoo's state
+              await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+          } else {
+              // If no initial selection, try to get from URL params
+              const urlParams = new URLSearchParams(window.location.search);
+              const partnerId = urlParams.get('partner_id');
+              if (partnerId) {
+                  const partnerName = urlParams.get('partner_name') || `Contact ${partnerId}`;
+                  await this.selectContact(parseInt(partnerId), partnerName);
+              }
+          }
+      
+          // Setup message input handling
+          this.setupMessageInput();
+      
+          // Attach event listener for sending messages
+          this.addEventListener(document, 'click', (event) => {
+            if (event.target.matches('.o_whatsapp_send_button') || 
+                event.target.closest('.o_whatsapp_send_button')) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.handleSendMessage();
             }
-        
-            console.log("WhatsApp Chat Client JS Initializing...");
-        
-            // Wait for Odoo form to be fully ready
-            await this.waitForOdooForm();
-        
-            // Get initial selected contact from hidden fields if already set by Python
-            const initialPartnerIdField = this.findOdooField('contact_partner_id');
-            const initialContactNameField = this.findOdooField('contact');
-        
-            if (initialPartnerIdField && initialPartnerIdField.value) {
-                this.currentSelectedPartnerId = parseInt(initialPartnerIdField.value);
-                this.currentSelectedContactName = initialContactNameField ? initialContactNameField.value : '';
-                console.log('Found initial selection:', {
-                    partnerId: this.currentSelectedPartnerId,
-                    contactName: this.currentSelectedContactName
-                });
-                
-                // Ensure our client state matches Odoo's state
-                await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
-            } else {
-                // If no initial selection, try to get from URL params
-                const urlParams = new URLSearchParams(window.location.search);
-                const partnerId = urlParams.get('partner_id');
-                if (partnerId) {
-                    const partnerName = urlParams.get('partner_name') || `Contact ${partnerId}`;
-                    await this.selectContact(parseInt(partnerId), partnerName);
-                }
+        });
+      
+          // Attach click listeners to all contact items
+          this.attachContactClickListeners();
+      
+          // Start auto-refresh
+          this.startAutoRefresh();
+      
+          // Ensure proper scrolling on initial load
+          setTimeout(() => {
+              const messagesContainer = document.getElementById('chat-messages-container');
+              if (messagesContainer) {
+                  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              }
+          }, 300);
+      
+          // Add mutation observer to watch for Odoo form changes
+          const formObserver = new MutationObserver((mutations) => {
+              mutations.forEach((mutation) => {
+                  if (mutation.type === 'attributes' && 
+                      (mutation.attributeName === 'value' || mutation.attributeName === 'class')) {
+                      const target = mutation.target;
+                      if (target.name === 'contact_partner_id' && target.value && 
+                          target.value !== this.currentSelectedPartnerId) {
+                          this.selectContact(parseInt(target.value), this.currentSelectedContactName);
+                      }
+                  }
+              });
+          });
+      
+          const formElement = document.querySelector('.o_form_view');
+          if (formElement) {
+              formObserver.observe(formElement, {
+                  attributes: true,
+                  subtree: true,
+                  attributeFilter: ['value', 'class']
+              });
+          }
+      
+          this.isInitialized = true;
+          console.log("WhatsApp Chat Client initialized successfully");
+      }
+
+        // Separate click handler method
+        handleSendClick(event) {
+            if (event.target.matches('.o_whatsapp_send_button') || 
+                event.target.closest('.o_whatsapp_send_button')) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.handleSendMessage();
             }
-        
-            // Setup message input handling
-            this.setupMessageInput();
-        
-            // Attach event listener for sending messages
-            document.addEventListener('click', (event) => {
-                if (event.target.matches('.o_whatsapp_send_button') || 
-                    event.target.closest('.o_whatsapp_send_button')) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    this.handleSendMessage();
-                }
-            });
-        
-            // Attach click listeners to all contact items
-            this.attachContactClickListeners();
-        
-            // Start auto-refresh
-            this.startAutoRefresh();
-        
-            // Ensure proper scrolling on initial load
-            setTimeout(() => {
-                const messagesContainer = document.getElementById('chat-messages-container');
-                if (messagesContainer) {
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                }
-            }, 300);
-        
-            // Add mutation observer to watch for Odoo form changes
-            const formObserver = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'attributes' && 
-                        (mutation.attributeName === 'value' || mutation.attributeName === 'class')) {
-                        const target = mutation.target;
-                        if (target.name === 'contact_partner_id' && target.value && 
-                            target.value !== this.currentSelectedPartnerId) {
-                            this.selectContact(parseInt(target.value), this.currentSelectedContactName);
-                        }
-                    }
-                });
-            });
-        
-            const formElement = document.querySelector('.o_form_view');
-            if (formElement) {
-                formObserver.observe(formElement, {
-                    attributes: true,
-                    subtree: true,
-                    attributeFilter: ['value', 'class']
-                });
-            }
-        
-            this.isInitialized = true;
-            console.log("WhatsApp Chat Client initialized successfully");
         }
+
+
 
         async updateOdooFields(partnerId, contactName) {
             console.log('Updating Odoo fields with:', { partnerId, contactName });
@@ -763,15 +808,29 @@
                 clearInterval(this.autoRefreshInterval);
                 this.autoRefreshInterval = null;
             }
+            
+            // Remove all registered event listeners
+            this.eventListeners.forEach(({ element, event, handler }) => {
+                element.removeEventListener(event, handler);
+            });
+            this.eventListeners = [];
+            
             this.isInitialized = false;
         }
     }
 
+
+
     // Global instance
     let whatsappChatClient = null;
 
-    // Initialize function
+    // Replace your current initialization code with this:
+    let initializationStarted = false;
+
     function initializeWhatsAppChat() {
+        if (initializationStarted) return;
+        initializationStarted = true;
+        
         console.log('Initialize WhatsApp Chat called');
         
         // Avoid multiple initializations
@@ -787,8 +846,14 @@
         whatsappChatClient = new WhatsAppChatClient();
         whatsappChatClient.initialize().catch(error => {
             console.error("Failed to initialize WhatsApp Chat:", error);
+            initializationStarted = false; // Allow retry on failure
         });
     }
+
+    // Initialize only once when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initializeWhatsAppChat, 100); // Small delay to ensure Odoo is ready
+    });
 
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
