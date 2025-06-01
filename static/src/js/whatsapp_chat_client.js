@@ -11,15 +11,43 @@
             this.currentSelectedContactName = null;
             this.autoRefreshInterval = null;
             this.lastMessageId = 0;
+            this.isInitialized = false;
         }
 
         // Helper function to get CSRF token
         getCSRFToken() {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
                             document.querySelector('input[name="csrf_token"]')?.value ||
-                            odoo?.csrf_token;
+                            window.odoo?.csrf_token;
             return csrfToken;
         }
+
+        // Enhanced field finder - works with Odoo's field rendering
+        findOdooField(fieldName) {
+            // Try multiple selectors that Odoo might use
+            const selectors = [
+                `input[name="${fieldName}"]`,
+                `[name="${fieldName}"]`,
+                `input[data-field-name="${fieldName}"]`,
+                `[data-field-name="${fieldName}"]`,
+                `.o_field_widget[name="${fieldName}"] input`,
+                `.o_field_widget[name="${fieldName}"] textarea`,
+                `#${fieldName}`,
+                `.o_field_${fieldName} input`
+            ];
+
+            for (const selector of selectors) {
+                const element = document.querySelector(selector);
+                if (element) {
+                    console.log(`Found field ${fieldName} using selector: ${selector}`);
+                    return element;
+                }
+            }
+            
+            console.warn(`Field ${fieldName} not found with any selector`);
+            return null;
+        }
+        
 
         // Helper function to make RPC calls using fetch
         async makeRpcCall(model, method, args = [], kwargs = {}) {
@@ -68,79 +96,164 @@
             }
         }
 
+        // Enhanced function to update Odoo fields
+        updateOdooFields(partnerId, contactName) {
+            console.log(`Updating Odoo fields: ${contactName} (ID: ${partnerId})`);
+            
+            // Find and update contact field - handle both regular and Odoo widget fields
+            const contactField = this.findOdooField('contact');
+            if (contactField) {
+                contactField.value = contactName;
+                // For Odoo widgets, we need to trigger their change handlers
+                const inputEvent = new Event('input', { bubbles: true });
+                const changeEvent = new Event('change', { bubbles: true });
+                contactField.dispatchEvent(inputEvent);
+                contactField.dispatchEvent(changeEvent);
+                
+                // Special handling for Odoo's field widgets
+                if (contactField.classList.contains('o_input')) {
+                    const odooField = contactField.closest('.o_field_widget');
+                    if (odooField) {
+                        odooField.dispatchEvent(new CustomEvent('value_changed', {
+                            detail: { value: contactName }
+                        }));
+                    }
+                }
+            }
+        
+            // Find and update partner ID field - handle both regular input and Odoo widget
+            const partnerIdField = this.findOdooField('contact_partner_id');
+            if (partnerIdField) {
+                partnerIdField.value = partnerId;
+                const inputEvent = new Event('input', { bubbles: true });
+                const changeEvent = new Event('change', { bubbles: true });
+                partnerIdField.dispatchEvent(inputEvent);
+                partnerIdField.dispatchEvent(changeEvent);
+                
+                // Special handling for Odoo's field widgets
+                if (partnerIdField.classList.contains('o_input')) {
+                    const odooField = partnerIdField.closest('.o_field_widget');
+                    if (odooField) {
+                        odooField.dispatchEvent(new CustomEvent('value_changed', {
+                            detail: { value: partnerId }
+                        }));
+                    }
+                }
+            }
+        
+            // Force Odoo to recognize the field changes
+            setTimeout(() => {
+                const formView = document.querySelector('.o_form_view');
+                if (formView) {
+                    formView.dispatchEvent(new CustomEvent('field_changed', {
+                        detail: {
+                            fieldName: 'contact_partner_id',
+                            value: partnerId
+                        }
+                    }));
+                    formView.dispatchEvent(new CustomEvent('field_changed', {
+                        detail: {
+                            fieldName: 'contact',
+                            value: contactName
+                        }
+                    }));
+                }
+            }, 100);
+        }
+
         // Function to handle contact selection (client-side)
         async selectContact(partnerId, contactName) {
-            // Validate input parameters
-            if (!partnerId || isNaN(partnerId)) {
-                console.error('Invalid partner ID:', partnerId);
-                return;
-            }
-            
-            if (!contactName || contactName === 'undefined') {
-                console.warn('Contact name is undefined, using fallback');
-                contactName = `Contact ${partnerId}`;
-            }
-
-            console.log(`Selecting contact: ${contactName} (ID: ${partnerId})`);
-
-            // Update hidden Odoo fields directly
-            const currentContactField = document.querySelector('input[name="contact"]');
-            const currentPartnerIdField = document.querySelector('input[name="contact_partner_id"]');
-            
-            if (currentContactField) currentContactField.value = contactName;
-            if (currentPartnerIdField) currentPartnerIdField.value = partnerId;
-
-            // Update global state
-            this.currentSelectedPartnerId = parseInt(partnerId);
-            this.currentSelectedContactName = contactName;
-            this.lastMessageId = 0;
-
-            // Visually highlight selected contact
-            document.querySelectorAll('.contact-item').forEach(function(item) {
-                item.style.backgroundColor = 'white';
-                item.style.border = '1px solid #eee';
-                item.classList.remove('selected');
-            });
-            
-            const selectedItem = document.querySelector(`.contact-item[data-partner-id="${partnerId}"]`);
-            if (selectedItem) {
-                selectedItem.style.backgroundColor = '#e8f5e8';
-                selectedItem.style.border = '2px solid #25D366';
-                selectedItem.classList.add('selected');
-            }
-
-            // Update the chat header with the selected contact's name
-            const chatHeaderName = document.getElementById('chat-header-contact-name');
-            if (chatHeaderName) {
-                chatHeaderName.textContent = contactName;
-            }
-
-            // Fetch messages for the newly selected contact using RPC
             try {
-                console.log('Fetching messages for partner ID:', partnerId);
+                // Validate and parse input
+                partnerId = parseInt(partnerId);
+                if (isNaN(partnerId)) {
+                    console.error('Invalid partner ID:', partnerId);
+                    return;
+                }
+        
+                // Update client state
+                this.currentSelectedPartnerId = partnerId;
+                this.currentSelectedContactName = contactName || `Contact ${partnerId}`;
+                this.lastMessageId = 0;
+        
+                // Update UI immediately
+                this.updateContactSelectionUI(partnerId);
+                this.updateChatHeader(this.currentSelectedContactName);
+        
+                // Synchronize with Odoo form fields
+                await this.updateOdooFields(partnerId, this.currentSelectedContactName);
+        
+                // Load messages for this contact
                 const messagesHtml = await this.makeRpcCall(
                     'whatsapp.chat',
                     'rpc_get_messages_html',
-                    [parseInt(partnerId)],
-                    {}
+                    [partnerId]
                 );
                 this.renderMessages(messagesHtml);
+        
             } catch (error) {
-                console.error("Error fetching messages via RPC:", error);
-                this.renderMessages(`<div style="color: red; padding: 20px;">Error loading messages: ${error.message}<br>Please check console for details.</div>`);
+                console.error("Error in selectContact:", error);
+                // Show error to user
+                this.renderMessages(`
+                    <div class="chat-error">
+                        Failed to load conversation: ${error.message}
+                    </div>
+                `);
             }
+        }
+
+        updateChatHeader(contactName) {
+            const chatHeader = document.getElementById('chat-header-contact-name');
+            if (chatHeader) {
+                chatHeader.textContent = contactName;
+            } else {
+                console.warn('Chat header element not found');
+            }
+        }
+
+        // Enhanced function to get message text
+        getMessageText() {
+            // Try multiple ways to find the message input
+            const messageInput = document.querySelector('textarea[name="new_message"]') ||
+                               document.querySelector('.o_whatsapp_new_message textarea') ||
+                               document.querySelector('.o_whatsapp_new_message') ||
+                               this.findOdooField('new_message');
+            
+            if (messageInput) {
+                console.log('Found message input:', messageInput, 'Value:', messageInput.value);
+                return messageInput.value ? messageInput.value.trim() : '';
+            }
+            
+            console.error('Message input not found. Selectors tried:', [
+                'textarea[name="new_message"]',
+                '.o_whatsapp_new_message textarea',
+                '.o_whatsapp_new_message',
+                'Odoo field new_message'
+            ]);
+            return '';
         }
 
         // Function to send message via RPC
         async sendMessage(recordId) {
-            const messageInput = document.querySelector('textarea[name="new_message"]');
-            const messageText = messageInput ? messageInput.value.trim() : '';
+            const messageText = this.getMessageText();
 
-            if (!this.currentSelectedPartnerId || !messageText) {
-                console.warn("No contact selected or message is empty.");
+            console.log('Send message attempt:', {
+                currentSelectedPartnerId: this.currentSelectedPartnerId,
+                messageText: messageText,
+                recordId: recordId
+            });
+
+            if (!this.currentSelectedPartnerId) {
+                console.error("No contact selected!");
+                alert("Please select a contact first.");
+                return;
+            }
+
+            if (!messageText) {
+                console.warn("Message is empty.");
                 // Show user-friendly message
                 const messagesContainer = document.getElementById('chat-messages-container');
-                if (messagesContainer && !messageText) {
+                if (messagesContainer) {
                     const tempMsg = document.createElement('div');
                     tempMsg.style.cssText = 'color: orange; padding: 10px; text-align: center; font-style: italic;';
                     tempMsg.textContent = 'Please enter a message';
@@ -169,8 +282,18 @@
                     }
                 );
 
-                // Clear the input field
-                if (messageInput) messageInput.value = '';
+                // Clear the input field immediately
+                const messageInput = this.findOdooField('new_message') || 
+                                   document.querySelector('textarea[name="new_message"]') ||
+                                   document.querySelector('.o_whatsapp_new_message textarea') ||
+                                   document.querySelector('.o_whatsapp_new_message');
+                
+                if (messageInput) {
+                    messageInput.value = '';
+                    // Trigger change event in case Odoo needs to sync the field
+                    messageInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
 
                 // After sending, immediately refresh the chat area for the current contact
                 await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
@@ -209,7 +332,8 @@
                     {}
                 );
                 
-                const contactsContainer = document.querySelector('.chat-contacts .contacts-list');
+                const contactsContainer = document.querySelector('.chat-contacts .contacts-list') ||
+                                        document.querySelector('.o_whatsapp_contacts_html');
                 if (contactsContainer) {
                     contactsContainer.innerHTML = contactsHtml;
                     // Re-attach click listeners to new contact items
@@ -247,91 +371,280 @@
         // Function to attach click listeners to contact items
         attachContactClickListeners() {
             console.log('Attaching contact click listeners...');
-            document.querySelectorAll('.contact-item').forEach(item => {
-                // Debug: log what data attributes are available
-                console.log('Contact item data:', {
-                    partnerId: item.dataset.partnerId,
-                    contactName: item.dataset.contactName,
-                    innerHTML: item.innerHTML.substring(0, 100) + '...'
-                });
-
-                // Remove existing listener to prevent duplicates
-                const newItem = item.cloneNode(true);
-                item.parentNode.replaceChild(newItem, item);
+            
+            // Use event delegation for better reliability
+            document.addEventListener('click', (event) => {
+                const contactItem = event.target.closest('.contact-item');
+                if (!contactItem) return;
                 
-                // Add new listener
-                newItem.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    
-                    // Get data from the clicked element
-                    const partnerId = event.currentTarget.dataset.partnerId || 
-                                    event.currentTarget.getAttribute('data-partner-id');
-                    const contactName = event.currentTarget.dataset.contactName || 
-                                      event.currentTarget.getAttribute('data-contact-name') ||
-                                      event.currentTarget.textContent.trim();
-                    
-                    console.log('Contact clicked:', { partnerId, contactName });
-                    
-                    if (partnerId && !isNaN(partnerId)) {
-                        this.selectContact(parseInt(partnerId), contactName);
-                    } else {
-                        console.error('Invalid contact data:', { partnerId, contactName });
-                        alert('Invalid contact data. Please refresh the page.');
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Get data attributes with fallbacks
+                const partnerId = contactItem.dataset.partnerId || 
+                                 contactItem.getAttribute('data-partner-id');
+                const contactName = contactItem.dataset.contactName || 
+                                  contactItem.getAttribute('data-contact-name') ||
+                                  contactItem.querySelector('strong')?.textContent.trim() || 
+                                  `Contact ${partnerId}`;
+                
+                if (partnerId && !isNaN(parseInt(partnerId))) {
+                    this.selectContact(parseInt(partnerId), contactName);
+                } else {
+                    console.error('Invalid contact data:', { partnerId, contactName });
+                }
+            });
+        }
+
+        // Enhanced message input handling
+        setupMessageInput() {
+            const messageInput = this.findOdooField('new_message') || 
+                               document.querySelector('textarea[name="new_message"]') ||
+                               document.querySelector('.o_whatsapp_new_message textarea') ||
+                               document.querySelector('.o_whatsapp_new_message');
+            
+            if (messageInput) {
+                console.log('Setting up message input:', messageInput);
+                
+                // Handle Enter key (send message) and Shift+Enter (new line)
+                messageInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        this.handleSendMessage();
                     }
                 });
+
+                // Auto-resize textarea
+                messageInput.addEventListener('input', () => {
+                    messageInput.style.height = 'auto';
+                    messageInput.style.height = messageInput.scrollHeight + 'px';
+                });
+
+                // Prevent form submission on Enter
+                messageInput.addEventListener('keypress', (event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return false;
+                    }
+                });
+            } else {
+                console.error('Message input not found during setup!');
+            }
+        }
+
+        // Handle send message with better error handling and UX
+        async handleSendMessage() {
+            try {
+                // Get the message text directly from the input field
+                const messageInput = document.querySelector('textarea[name="new_message"]') ||
+                                   document.querySelector('.o_whatsapp_new_message textarea') ||
+                                   document.querySelector('.o_whatsapp_new_message') ||
+                                   this.findOdooField('new_message');
+                
+                if (!messageInput) {
+                    console.error("Message input element not found!");
+                    return;
+                }
+        
+                const messageText = messageInput.value.trim();
+                
+                if (!this.currentSelectedPartnerId) {
+                    this.showChatError('Please select a contact first');
+                    return;
+                }
+        
+                if (!messageText) {
+                    this.showChatError('Please enter a message');
+                    return;
+                }
+        
+                this.showSendingStatus(true);
+        
+                // Call the dedicated RPC method
+                const result = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'rpc_send_message',
+                    [parseInt(this.currentSelectedPartnerId), messageText]
+                );
+        
+                // Clear the input on success
+                messageInput.value = '';
+                messageInput.dispatchEvent(new Event('change', { bubbles: true }));
+                messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+        
+                // Refresh the chat
+                await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+        
+                // Show success message
+                if (result && result.status === 'success') {
+                    this.showChatSuccess(result.message);
+                }
+        
+            } catch (error) {
+                console.error("Error sending message:", error);
+                this.showChatError(error.message || 'Failed to send message');
+            } finally {
+                this.showSendingStatus(false);
+            }
+        }
+
+
+        showChatSuccess(message) {
+            const messagesContainer = document.getElementById('chat-messages-container');
+            if (messagesContainer) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'chat-success-message';
+                successDiv.textContent = message;
+                messagesContainer.appendChild(successDiv);
+                setTimeout(() => successDiv.remove(), 3000);
+            }
+        }
+        
+        showChatError(message) {
+            const messagesContainer = document.getElementById('chat-messages-container');
+            if (messagesContainer) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'chat-error-message';
+                errorDiv.textContent = message;
+                messagesContainer.appendChild(errorDiv);
+                setTimeout(() => errorDiv.remove(), 3000);
+            }
+        }
+        
+        showSendingStatus(isSending) {
+            const sendButton = document.querySelector('.o_whatsapp_send_button');
+            if (sendButton) {
+                if (isSending) {
+                    sendButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Sending...';
+                    sendButton.disabled = true;
+                } else {
+                    sendButton.innerHTML = '<i class="fa fa-paper-plane"></i> Send';
+                    sendButton.disabled = false;
+                }
+            }
+        }
+
+
+
+        updateContactSelectionUI(partnerId) {
+            // Remove selection from all contacts first
+            document.querySelectorAll('.contact-item').forEach(item => {
+                item.style.backgroundColor = 'white';
+                item.style.border = '1px solid #eee';
+                item.classList.remove('selected');
             });
+            
+            // Highlight the selected contact
+            const selectedItem = document.querySelector(`.contact-item[data-partner-id="${partnerId}"]`);
+            if (selectedItem) {
+                selectedItem.style.backgroundColor = '#e8f5e8';
+                selectedItem.style.border = '2px solid #25D366';
+                selectedItem.classList.add('selected');
+                
+                // Scroll the selected item into view if needed
+                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                console.warn(`Contact item with ID ${partnerId} not found in DOM`);
+            }
+        }
+
+     
+        // Wait for Odoo to fully render the form
+        async waitForOdooForm(maxWait = 10000) {
+            const startTime = Date.now();
+            
+            while (Date.now() - startTime < maxWait) {
+                // Check if essential elements exist
+                const formView = document.querySelector('.o_form_view');
+                const contactField = this.findOdooField('contact_partner_id');
+                
+                if (formView && contactField) {
+                    console.log('Odoo form is ready');
+                    return true;
+                }
+                
+                // Wait a bit before checking again
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            console.warn('Timeout waiting for Odoo form to be ready');
+            return false;
         }
 
         // Main initialization function
         async initialize() {
+
+              // Verify all required methods exist
+                const requiredMethods = [
+                    'updateContactSelectionUI',
+                    'updateChatHeader',
+                    'updateOdooFields',
+                    'renderMessages'
+                ];
+                
+                requiredMethods.forEach(method => {
+                    if (typeof this[method] !== 'function') {
+                        console.error(`Missing required method: ${method}`);
+                        throw new Error(`WhatsAppChatClient missing required method: ${method}`);
+                    }
+                });
+
+
+            if (this.isInitialized) {
+                console.log('WhatsApp Chat Client already initialized, skipping...');
+                return;
+            }
+        
             console.log("WhatsApp Chat Client JS Initializing...");
-
+        
+            // Wait for Odoo form to be fully ready
+            await this.waitForOdooForm();
+        
             // Get initial selected contact from hidden fields if already set by Python
-            const initialPartnerIdField = document.querySelector('input[name="contact_partner_id"]');
-            const initialContactNameField = document.querySelector('input[name="contact"]');
-
+            const initialPartnerIdField = this.findOdooField('contact_partner_id');
+            const initialContactNameField = this.findOdooField('contact');
+        
             if (initialPartnerIdField && initialPartnerIdField.value) {
                 this.currentSelectedPartnerId = parseInt(initialPartnerIdField.value);
                 this.currentSelectedContactName = initialContactNameField ? initialContactNameField.value : '';
+                console.log('Found initial selection:', {
+                    partnerId: this.currentSelectedPartnerId,
+                    contactName: this.currentSelectedContactName
+                });
+                
+                // Ensure our client state matches Odoo's state
                 await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+            } else {
+                // If no initial selection, try to get from URL params
+                const urlParams = new URLSearchParams(window.location.search);
+                const partnerId = urlParams.get('partner_id');
+                if (partnerId) {
+                    const partnerName = urlParams.get('partner_name') || `Contact ${partnerId}`;
+                    await this.selectContact(parseInt(partnerId), partnerName);
+                }
             }
-
+        
+            // Setup message input handling
+            this.setupMessageInput();
+        
             // Attach event listener for sending messages
-            const sendMessageButton = document.querySelector('.o_whatsapp_send_button');
-            if (sendMessageButton) {
-                // Try multiple ways to get the record ID
-                let currentRecordId = this.getCurrentRecordId();
-
-                sendMessageButton.addEventListener('click', (event) => {
+            document.addEventListener('click', (event) => {
+                if (event.target.matches('.o_whatsapp_send_button') || 
+                    event.target.closest('.o_whatsapp_send_button')) {
                     event.preventDefault();
-                    // Re-check record ID in case it changed
-                    currentRecordId = this.getCurrentRecordId();
-                    if (currentRecordId) {
-                        this.sendMessage(currentRecordId);
-                    } else {
-                        console.error("Could not find current record ID to send message.");
-                        alert("Error: Chat session not properly initialized. Please refresh the page.");
-                    }
-                });
-            }
-
-            // Also handle Enter key in message input
-            const messageInput = document.querySelector('textarea[name="new_message"]');
-            if (messageInput) {
-                messageInput.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        sendMessageButton && sendMessageButton.click();
-                    }
-                });
-            }
-
+                    event.stopPropagation();
+                    this.handleSendMessage();
+                }
+            });
+        
             // Attach click listeners to all contact items
             this.attachContactClickListeners();
-
+        
             // Start auto-refresh
             this.startAutoRefresh();
-
+        
             // Ensure proper scrolling on initial load
             setTimeout(() => {
                 const messagesContainer = document.getElementById('chat-messages-container');
@@ -339,6 +652,74 @@
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }
             }, 300);
+        
+            // Add mutation observer to watch for Odoo form changes
+            const formObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && 
+                        (mutation.attributeName === 'value' || mutation.attributeName === 'class')) {
+                        const target = mutation.target;
+                        if (target.name === 'contact_partner_id' && target.value && 
+                            target.value !== this.currentSelectedPartnerId) {
+                            this.selectContact(parseInt(target.value), this.currentSelectedContactName);
+                        }
+                    }
+                });
+            });
+        
+            const formElement = document.querySelector('.o_form_view');
+            if (formElement) {
+                formObserver.observe(formElement, {
+                    attributes: true,
+                    subtree: true,
+                    attributeFilter: ['value', 'class']
+                });
+            }
+        
+            this.isInitialized = true;
+            console.log("WhatsApp Chat Client initialized successfully");
+        }
+
+        async updateOdooFields(partnerId, contactName) {
+            console.log('Updating Odoo fields with:', { partnerId, contactName });
+            
+            // Find fields using multiple possible selectors
+            const contactField = this.findOdooField('contact');
+            const partnerIdField = this.findOdooField('contact_partner_id');
+            
+            if (contactField) {
+                contactField.value = contactName;
+                // Trigger all possible change events
+                contactField.dispatchEvent(new Event('change', { bubbles: true }));
+                contactField.dispatchEvent(new Event('input', { bubbles: true }));
+                contactField.dispatchEvent(new Event('blur', { bubbles: true }));
+            }
+            
+            if (partnerIdField) {
+                partnerIdField.value = partnerId;
+                // Trigger all possible change events
+                partnerIdField.dispatchEvent(new Event('change', { bubbles: true }));
+                partnerIdField.dispatchEvent(new Event('input', { bubbles: true }));
+                partnerIdField.dispatchEvent(new Event('blur', { bubbles: true }));
+            }
+            
+            // Special handling for Odoo widgets
+            if (window.odoo && window.odoo.__WOWL_DEBUG__) {
+                setTimeout(() => {
+                    const form = document.querySelector('.o_form_view');
+                    if (form) {
+                        form.dispatchEvent(new CustomEvent('field_changed', {
+                            detail: {
+                                fieldName: 'contact_partner_id',
+                                value: partnerId
+                            }
+                        }));
+                    }
+                }, 100);
+            }
+            
+            // Wait for Odoo to process changes
+            await new Promise(resolve => setTimeout(resolve, 50));
         }
 
         // Helper function to get current record ID
@@ -368,6 +749,11 @@
                 return parseInt(idParam);
             }
 
+            // Method 5: Try to get from Odoo's context
+            if (window.odoo && window.odoo.session && window.odoo.session.active_id) {
+                return parseInt(window.odoo.session.active_id);
+            }
+
             return null;
         }
 
@@ -377,6 +763,7 @@
                 clearInterval(this.autoRefreshInterval);
                 this.autoRefreshInterval = null;
             }
+            this.isInitialized = false;
         }
     }
 
@@ -385,7 +772,14 @@
 
     // Initialize function
     function initializeWhatsAppChat() {
+        console.log('Initialize WhatsApp Chat called');
+        
         // Avoid multiple initializations
+        if (whatsappChatClient && whatsappChatClient.isInitialized) {
+            console.log('Chat client already initialized, skipping...');
+            return;
+        }
+        
         if (whatsappChatClient) {
             whatsappChatClient.destroy();
         }
@@ -411,14 +805,21 @@
         setTimeout(initializeWhatsAppChat, 100);
     }
 
-    // Also try to initialize after a short delay for Odoo's dynamic content
+    // Also try to initialize after delays for Odoo's dynamic content
     setTimeout(initializeWhatsAppChat, 1000);
+    setTimeout(initializeWhatsAppChat, 3000);
 
-    // Listen for Odoo's custom events
+    // Listen for Odoo's potential events
     document.addEventListener('DOMContentLoaded', initializeWhatsAppChat);
+    
+    // Listen for hash changes (Odoo navigation)
+    window.addEventListener('hashchange', () => {
+        setTimeout(initializeWhatsAppChat, 500);
+    });
 
     // Expose to global scope for debugging
     window.WhatsAppChatClient = WhatsAppChatClient;
     window.initializeWhatsAppChat = initializeWhatsAppChat;
+    window.whatsappChatClient = whatsappChatClient;
 
 })();

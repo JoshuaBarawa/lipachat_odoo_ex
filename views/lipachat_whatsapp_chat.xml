@@ -7,6 +7,11 @@
             <field name="arch" type="xml">
                 <form string="WhatsApp Chat Interface" create="false" edit="false" delete="false">
                     <sheet>
+                    
+                         <!-- Hidden fields for state management -->
+                        <field name="contact" invisible="1"/>
+                        <field name="contact_partner_id" invisible="1"/>
+
                         <div class="chat-container">
                             <div class="chat-contacts">
                                 <h3>Conversations</h3>
@@ -25,9 +30,9 @@
                                 </div>
                                 <div class="chat-input-container">
                                     <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/>   
-                                    <button name="send_message" type="object" string="Send" class="btn btn-primary o_whatsapp_send_button">
-                                        <i class="fa fa-paper-plane"/>
-                                    </button>
+                                     <div class="btn btn-primary o_whatsapp_send_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
+                                        <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -265,80 +265,89 @@ class WhatsappChat(models.TransientModel):
                 record.messages = self.env['lipachat.message']
 
     def send_message(self):
+        """
+        Send a WhatsApp message. This method is called via RPC from the JavaScript client.
+        The message content and contact info are taken from the current record.
+        """
         self.ensure_one()
-        if not self.contact_partner_id or not self.new_message.strip():
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Error',
-                    'message': 'Please select a contact and enter a message.',
-                    'type': 'warning'
-                }
-            }
-
+        
+        # Get values from the current record
+        if not self.contact_partner_id:
+            raise UserError("Please select a contact first")
+        
+        if not self.new_message or not self.new_message.strip():
+            raise UserError("Please enter a message")
+        
         partner = self.env['res.partner'].browse(self.contact_partner_id)
         if not partner.exists():
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Error',
-                    'message': 'Selected contact not found.',
-                    'type': 'danger'
-                }
-            }
-
+            raise UserError("Selected contact not found")
+        
         config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
         if not config:
+            raise UserError("No active LipaChat configuration found")
+        
+        try:
+            # Create the message directly without relying on the transient record
+            message = self.env['lipachat.message'].create({
+                'partner_id': partner.id,
+                'phone_number': partner.mobile or partner.phone,
+                'config_id': config.id,
+                'message_type': 'text',
+                'message_text': self.new_message.strip(),
+                'state': 'draft'
+            })
+            
+            message.send_message()
+            self.new_message = ''  # Clear the message field
+            
             return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Error',
-                    'message': 'No active LipaChat configuration found. Please configure LipaChat first.',
-                    'type': 'danger'
-                }
+                'status': 'success',
+                'message': f'Message sent to {partner.name}'
             }
+        except Exception as e:
+            _logger.error(f"Failed to send message: {str(e)}")
+            raise UserError(f"Failed to send message: {str(e)}")
+    
 
+    @api.model
+    def rpc_send_message(self, partner_id, message_text):
+        """
+        Dedicated RPC method for sending messages that doesn't rely on transient record state
+        """
+        if not partner_id:
+            raise UserError("Please select a contact first")
+        
+        if not message_text or not message_text.strip():
+            raise UserError("Please enter a message")
+        
+        partner = self.env['res.partner'].browse(partner_id)
+        if not partner.exists():
+            raise UserError("Selected contact not found")
+        
+        config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
+        if not config:
+            raise UserError("No active LipaChat configuration found")
+        
         try:
             message = self.env['lipachat.message'].create({
                 'partner_id': partner.id,
                 'phone_number': partner.mobile or partner.phone,
                 'config_id': config.id,
                 'message_type': 'text',
-                'message_text': self.new_message,
-                'state': 'draft' 
+                'message_text': message_text.strip(),
+                'state': 'draft'
             })
-
-            message.send_message()
-
-            self.new_message = '' 
             
-            # Crucially, remove the full 'reload' action here.
-            # Instead, we will rely on client-side JS to update the messages.
-            # We can still send a notification if needed.
+            message.send_message()
             return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Success',
-                    'message': f'Message sent to {partner.name}. The chat will update automatically.',
-                    'type': 'success'
-                }
+                'status': 'success',
+                'message': f'Message sent to {partner.name}'
             }
-
         except Exception as e:
             _logger.error(f"Failed to send message: {str(e)}")
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Error',
-                    'message': f'Failed to send message: {str(e)}',
-                    'type': 'danger'
-                }
-            }
+            raise UserError(f"Failed to send message: {str(e)}")
+    
+
 
     @api.model
     def rpc_get_messages_html(self, partner_id):
