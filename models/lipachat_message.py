@@ -138,17 +138,22 @@ class LipachatMessage(models.Model):
         if not recipients:
             raise ValidationError(_("No valid recipients found. Please check phone numbers."))
         
-        # If multiple recipients, create individual message records
-        if len(recipients) > 1:
-            return self._send_bulk_messages(recipients, config)
-        else:
-            # Single recipient - send directly
-            return self._send_single_message(recipients[0], config)
+        # Always create individual message records, even for single recipients
+        return self._send_bulk_messages(recipients, config)
 
     def _send_bulk_messages(self, recipients, config):
         """Create individual message records for each recipient and send them"""
-        # Mark current record as bulk template
-        self.is_bulk_template = True
+        # Mark current record as bulk template only if more than one recipient
+        if len(recipients) > 1:
+            self.is_bulk_template = True
+        else:
+            # For single recipient, update current record with recipient info
+            recipient = recipients[0]
+            self.partner_id = recipient['partner_id'] if recipient['partner_id'] else False
+            self.phone_number = recipient['phone']
+            # Send directly without creating a copy
+            return self._send_single_message(recipient, config)
+        
         self.state = 'draft'  # Keep template as draft
         
         individual_messages = []
