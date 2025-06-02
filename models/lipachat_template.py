@@ -12,7 +12,12 @@ class LipachatTemplate(models.Model):
     _rec_name = 'name'
 
     name = fields.Char('Template Name', required=True)
-    language = fields.Char('Language', default='en', required=True)
+    language = fields.Selection(
+        selection=[('en', 'English'), ('es', 'Spanish'), ('fr', 'French')],
+        string='Language',
+        default='en',
+        required=True
+    )
     category = fields.Selection([
         ('MARKETING', 'Marketing'),
         ('UTILITY', 'Utility'),
@@ -20,89 +25,108 @@ class LipachatTemplate(models.Model):
     ], 'Category', required=True, default='UTILITY')
     
     phone_number = fields.Char('Phone Number', required=True)
-    template_id = fields.Char('Template ID')
     status = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected')
-    ], 'Status', default='draft')
+    ], 'Status', default='draft', readonly=True)
     
-    # Component fields
-    header_format = fields.Selection([
+    # Header components
+    header_type = fields.Selection([
         ('TEXT', 'Text'),
         ('IMAGE', 'Image'),
         ('VIDEO', 'Video'),
         ('DOCUMENT', 'Document')
-    ], 'Header Format')
-    header_text = fields.Char('Header Text')
-    header_example = fields.Char('Header Example')
-    media_id = fields.Char('Media ID')
+    ], 'Type', default='TEXT')
+    header_text = fields.Char('Text')
+    header_media = fields.Binary('Media File', help="Upload media file for header")
     
+    # Body component
     body_text = fields.Text('Body Text', required=True)
-    body_examples = fields.Text('Body Examples (JSON)')
     
-    footer_text = fields.Char('Footer Text')
+    # Footer component (optional)
+    footer_text = fields.Char('Text')
     
-    # Buttons
-    buttons_data = fields.Text('Buttons Data (JSON)')
+    # Buttons (optional, max 3)
+    button_1_type = fields.Selection([
+        ('QUICK_REPLY', 'Quick Reply'),
+        ('URL', 'URL'),
+        ('PHONE_NUMBER', 'Phone Number')
+    ], 'Type', default='QUICK_REPLY')
+    button_1_text = fields.Char('Text')
+    button_1_url = fields.Char('URL', help="For URL button type only")
+    button_1_phone = fields.Char('Phone Number', help="For PHONE_NUMBER button type only")
     
-    # Authentication specific
-    add_security_recommendation = fields.Boolean('Add Security Recommendation')
-    code_expiration_minutes = fields.Integer('Code Expiration Minutes')
+    button_2_type = fields.Selection([
+        ('QUICK_REPLY', 'Quick Reply'),
+        ('URL', 'URL'),
+        ('PHONE_NUMBER', 'Phone Number')
+    ], 'Type', default='QUICK_REPLY')
+    button_2_text = fields.Char('Text')
+    button_2_url = fields.Char('URL', help="For URL button type only")
+    button_2_phone = fields.Char('Phone Number', help="For PHONE_NUMBER button type only")
+    
+    button_3_type = fields.Selection([
+        ('QUICK_REPLY', 'Quick Reply'),
+        ('URL', 'URL'),
+        ('PHONE_NUMBER', 'Phone Number')
+    ], 'Type', default='QUICK_REPLY')
+    button_3_text = fields.Char('Text')
+    button_3_url = fields.Char('URL', help="For URL button type only")
+    button_3_phone = fields.Char('Phone Number', help="For PHONE_NUMBER button type only")
     
     component_data = fields.Text('Component Data (JSON)', compute='_compute_component_data', store=True)
     
-    @api.depends('header_format', 'header_text', 'header_example', 'media_id', 
-                 'body_text', 'body_examples', 'footer_text', 'buttons_data',
-                 'add_security_recommendation', 'code_expiration_minutes')
+    @api.depends('header_type', 'header_text', 'header_media', 
+                'body_text', 'footer_text',
+                'button_1_text', 'button_1_type', 'button_1_url', 'button_1_phone',
+                'button_2_text', 'button_2_type', 'button_2_url', 'button_2_phone',
+                'button_3_text', 'button_3_type', 'button_3_url', 'button_3_phone')
     def _compute_component_data(self):
-        """Compute component data JSON"""
+        """Compute component data JSON in simplified format"""
         for record in self:
             component = {}
             
             # Header
-            if record.header_format and record.header_text:
-                component['header'] = {
-                    'format': record.header_format,
-                    'text': record.header_text
-                }
-                if record.header_example:
-                    component['header']['example'] = record.header_example
-            elif record.media_id:
-                component['header'] = {
-                    'format': record.header_format,
-                    'mediaId': record.media_id
-                }
+            if record.header_type and (record.header_text or record.header_media):
+                header_data = {'format': record.header_type}
+                if record.header_type == 'TEXT' and record.header_text:
+                    header_data['text'] = record.header_text
+                elif record.header_media:
+                    header_data['media'] = True  # Placeholder for actual media ID
+                
+                component['header'] = header_data
             
             # Body
-            body_component = {'text': record.body_text}
-            if record.body_examples:
-                try:
-                    examples = json.loads(record.body_examples)
-                    body_component['examples'] = examples
-                except:
-                    pass
-            
-            if record.category == 'AUTHENTICATION':
-                body_component['addSecurityRecommendation'] = record.add_security_recommendation
-            
-            component['body'] = body_component
+            component['body'] = {'text': record.body_text}
             
             # Footer
             if record.footer_text:
-                footer_component = {'text': record.footer_text}
-                if record.category == 'AUTHENTICATION' and record.code_expiration_minutes:
-                    footer_component['codeExpirationMinutes'] = record.code_expiration_minutes
-                component['footer'] = footer_component
+                component['footer'] = {'text': record.footer_text}
             
             # Buttons
-            if record.buttons_data:
-                try:
-                    buttons = json.loads(record.buttons_data)
-                    component['buttons'] = buttons
-                except:
-                    pass
+            buttons = []
+            for i in range(1, 4):
+                button_text = getattr(record, f'button_{i}_text')
+                if button_text:
+                    button_type = getattr(record, f'button_{i}_type')
+                    button_data = {
+                        'type': button_type,
+                        'text': button_text
+                    }
+                    if button_type == 'URL':
+                        button_url = getattr(record, f'button_{i}_url')
+                        if button_url:
+                            button_data['url'] = button_url
+                    elif button_type == 'PHONE_NUMBER':
+                        button_phone = getattr(record, f'button_{i}_phone')
+                        if button_phone:
+                            button_data['phone_number'] = button_phone
+                    buttons.append(button_data)
+            
+            if buttons:
+                component['buttons'] = buttons
             
             record.component_data = json.dumps(component, indent=2)
     
@@ -132,9 +156,6 @@ class LipachatTemplate(models.Model):
             
             if response.status_code == 200:
                 self.status = 'submitted'
-                response_data = response.json()
-                if 'id' in response_data:
-                    self.template_id = response_data['id']
                 return {
                     'type': 'ir.actions.client',
                     'tag': 'display_notification',
@@ -146,40 +167,6 @@ class LipachatTemplate(models.Model):
                 }
             else:
                 raise ValidationError(_('Failed to create template: %s') % response.text)
-                
-        except requests.RequestException as e:
-            raise ValidationError(_('Connection error: %s') % str(e))
-    
-    def sync_templates(self):
-        """Sync templates from API"""
-        config = self.env['lipachat.config'].get_active_config()
-        
-        headers = {
-            'apiKey': config.api_key,
-            'Content-Type': 'application/json'
-        }
-        
-        try:
-            response = requests.get(
-                f"{config.api_base_url}/template/{self.phone_number}",
-                headers=headers,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                templates = response.json()
-                # Process and update local templates
-                return {
-                    'type': 'ir.actions.client',
-                    'tag': 'display_notification',
-                    'params': {
-                        'title': _('Success'),
-                        'message': _('Templates synchronized successfully!'),
-                        'type': 'success',
-                    }
-                }
-            else:
-                raise ValidationError(_('Failed to sync templates: %s') % response.text)
                 
         except requests.RequestException as e:
             raise ValidationError(_('Connection error: %s') % str(e))

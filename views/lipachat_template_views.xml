@@ -9,56 +9,71 @@
                 <form string="WhatsApp Template">
                     <header>
                         <button name="create_template" string="Create Template" type="object" class="btn-primary"/>
-                        <button name="sync_templates" string="Sync Templates" type="object"/>
-                        <field name="status" widget="statusbar"/>
+                        <field name="status" widget="statusbar" statusbar_visible="draft,submitted,approved,rejected"/>
                     </header>
                     <sheet>
-                        <group>
-                            <group>
-                                <field name="name"/>
-                                <field name="language"/>
-                                <field name="category"/>
-                                <field name="phone_number"/>
-                            </group>
-                            <group>
-                                <field name="template_id" readonly="1"/>
-                            </group>
+                        <!-- First row with Template Name, Category, and Language -->
+                        <group class="flex-container">
+                            <field name="name" class="flex-item"/>
+                            <field name="category" class="flex-item"/>
+                            <field name="language" class="flex-item"/>
+                        </group>
+
+                        <!-- Phone number field with input type=tel -->
+                        <group string="WABA Phone Number" class="mt16">
+                            <field name="phone_number" widget="phone" placeholder="Example: 254110090747"/>
                         </group>
                         
-                        <notebook>
-                            <page string="Template Components">
-                                <!-- Removed attrs for Odoo 17 compatibility -->
-                                <group string="Header">
-                                    <field name="header_format"/>
-                                    <field name="header_text"/>
-                                    <field name="header_example"/>
-                                    <field name="media_id"/>
-                                </group>
-                                
-                                <group string="Body">
-                                    <field name="body_text" nolabel="1"/>
-                                    <field name="body_examples" widget="ace" options="{'mode': 'json'}" placeholder='["Example 1", "Example 2"]'/>
-                                </group>
-                                
-                                <group string="Footer">
-                                    <field name="footer_text"/>
-                                </group>
-                                
-                                <group string="Authentication Settings">
-                                    <field name="add_security_recommendation"/>
-                                    <field name="code_expiration_minutes"/>
-                                </group>
-                                
-                                <group string="Buttons">
-                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" nolabel="1" 
-                                           placeholder='[{"type": "QUICK_REPLY", "text": "Button Text"}]'/>
-                                </group>
-                            </page>
+                        <!-- Header Section -->
+                        <group string="Header" class="mt16">
+                            <field name="header_type"/>
+                            <field name="header_text" invisible="header_type != 'TEXT'"/>
+                            <field name="header_media" invisible="header_type == 'TEXT'" 
+                                   filename="header_media_filename"/>
+                        </group>
+                        
+                        <!-- Body Section -->
+                        <group string="Body" class="mt16">
+                            <field name="body_text" nolabel="1" placeholder="Enter your message..."/>
+                        </group>
+                        
+                        <!-- Footer Section -->
+                        <group string="Footer (Optional)" class="mt16">
+                            <field name="footer_text" placeholder="Enter footer text..."/>
+                        </group>
+                        
+                        <!-- Buttons Section -->
+                        <group string="Buttons (Optional, max 3)" class="mt16">
+                            <h2 class="button-count-titles">Button 1</h2>
+                            <group>
+                               <field name="button_1_type"/>
+                                <field name="button_1_text" placeholder="Button text"/> 
+                                <field name="button_1_url" invisible="button_1_type != 'URL'" 
+                                       placeholder="https://example.com"/>
+                                <field name="button_1_phone" invisible="button_1_type != 'PHONE_NUMBER'" 
+                                       widget="phone" placeholder="254712345678"/>
+                            </group>
                             
-                            <page string="Generated JSON">
-                                <field name="component_data" widget="ace" options="{'mode': 'json'}" readonly="1" nolabel="1"/>
-                            </page>
-                        </notebook>
+                            <h2 class="button-count-titles">Button 2</h2>
+                            <group>
+                                <field name="button_2_type"/>
+                                <field name="button_2_text" placeholder="Button text"/>
+                                <field name="button_2_url" invisible="button_2_type != 'URL'" 
+                                       placeholder="https://example.com"/>
+                                <field name="button_2_phone" invisible="button_2_type != 'PHONE_NUMBER'" 
+                                       widget="phone" placeholder="254712345678"/>
+                            </group>
+                            
+                            <h2 class="button-count-titles">Button 3</h2>
+                            <group>
+                                <field name="button_3_type"/>
+                                <field name="button_3_text" placeholder="Button text"/>
+                                <field name="button_3_url" invisible="button_3_type != 'URL'" 
+                                       placeholder="https://example.com"/>
+                                <field name="button_3_phone" invisible="button_3_type != 'PHONE_NUMBER'" 
+                                       widget="phone" placeholder="254712345678"/>
+                            </group>
+                        </group>
                     </sheet>
                 </form>
             </field>

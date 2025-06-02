@@ -1,0 +1,13 @@
+.flex-container {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+.flex-item {
+    flex: 1;
+    min-width: 0;
+}
+.button-count-titles{
+    font-size: 14px;
+    font-weight: 600;
+}

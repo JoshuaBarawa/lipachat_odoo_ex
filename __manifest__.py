@@ -54,6 +54,7 @@
     'assets': {
     'web.assets_backend': [
         'lipachat_odoo_ex/static/src/css/chat_interface.css',
+         'lipachat_odoo_ex/static/src/css/whatsapp_template.css',
         'lipachat_odoo_ex/static/src/js/whatsapp_chat_client.js',
     ],
    },
