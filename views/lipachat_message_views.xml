@@ -104,29 +104,44 @@
 
                         <notebook>
                             <page string="Message Content">
-                                <!-- Main message text - full width, no group wrapper -->
-                                <div class="o_group" style="width: 100%; max-width: 100%;">
+                        
+                                  <!-- Text Message Section -->
+                                <div class="o_group" string="Text Message" invisible="message_type != 'text'" style="width: 100%; max-width: 100%;">
                                     <field name="message_text" nolabel="1" placeholder="Enter your message text" 
                                            style="width: 100%; max-width: 100%;" readonly="state != 'draft'"/>
                                 </div>
-                                <group string="Media Message">
+
+                                <!-- Media Message Section -->
+                                <group string="Media Message" invisible="message_type != 'media'">
                                     <field name="media_type" readonly="state != 'draft'"/>
                                     <field name="media_url" readonly="state != 'draft'"/>
                                     <field name="caption" readonly="state != 'draft'"/>
                                 </group>
-                                <group string="Interactive Content">
+
+                                <!-- Interactive Buttons Section -->
+                                <group string="Interactive Buttons" invisible="message_type != 'buttons'">
+                                    <field name="body_text" readonly="state != 'draft'"/>
+                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" 
+                                        nolabel="1" readonly="state != 'draft'"/>
+                                </group>
+
+                                 <!-- Interactive List Section -->
+                                <group string="Interactive List" invisible="message_type != 'list'">
                                     <field name="header_text" readonly="state != 'draft'"/>
                                     <field name="body_text" readonly="state != 'draft'"/>
                                     <field name="button_text" readonly="state != 'draft'"/>
                                     <field name="buttons_data" widget="ace" options="{'mode': 'json'}" 
-                                           nolabel="1" readonly="state != 'draft'"/>
+                                        nolabel="1" readonly="state != 'draft'"/>
                                 </group>
-                                <group string="Template Message">
+                                
+                                <!-- Template Message Section -->
+                                <group string="Template Message" invisible="message_type != 'template'">
                                     <field name="template_name" readonly="state != 'draft'"/>
                                     <field name="template_language" readonly="state != 'draft'"/>
                                     <field name="template_data" widget="ace" options="{'mode': 'json'}" 
-                                           readonly="state != 'draft'"/>
+                                        readonly="state != 'draft'"/>
                                 </group>
+
                             </page>
 
                             <page string="Response Details">

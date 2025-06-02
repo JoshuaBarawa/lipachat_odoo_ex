@@ -107,7 +107,7 @@ class LipachatMessage(models.Model):
     def _check_recipients(self):
         for record in self:
             if not record.partner_id and not record.partner_ids and not record.phone_number:
-                raise ValidationError(_("You must specify at least one recipient (contact or phone number)"))
+                raise ValidationError(_("You must specify at least one recipient (contact)"))
             
     @api.constrains('message_type', 'message_text')
     def _check_message_content(self):
@@ -374,3 +374,29 @@ class LipachatMessage(models.Model):
             error_msg = f"Invalid JSON response: {response.text}"
             _logger.error(error_msg)
             raise ValidationError(error_msg)
+        
+
+    # Add to LipachatMessage class
+    @api.onchange('message_type')
+    def _onchange_message_type(self):
+        """Set default values and visibility when message type changes"""
+        for record in self:
+            # Clear fields when changing message type
+            if record.message_type != 'text':
+                record.message_text = False
+            if record.message_type != 'media':
+                record.media_type = False
+                record.media_url = False
+                record.caption = False
+            if record.message_type != 'buttons':
+                record.body_text = False
+                record.buttons_data = False
+            if record.message_type != 'list':
+                record.header_text = False
+                record.body_text = False
+                record.button_text = False
+                record.buttons_data = False
+            if record.message_type != 'template':
+                record.template_name = False
+                record.template_language = 'en'
+                record.template_data = False
