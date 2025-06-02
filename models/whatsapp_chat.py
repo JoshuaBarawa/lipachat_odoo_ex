@@ -174,7 +174,7 @@ class WhatsappChat(models.TransientModel):
 
         is_sent_by_me = (msg_data['state'] in ['sent', 'delivered', 'failed', 'draft']) 
         bubble_align = 'margin-left: auto;' if is_sent_by_me else 'margin-right: auto;'
-        bubble_background = '#e0ffc6' if is_sent_by_me else '#ffffff'
+        bubble_background = '#d9fdd3' if is_sent_by_me else '#ffffff'
 
         content = "Unsupported Message Type"
         if msg_data['message_type'] == 'text':
@@ -192,12 +192,12 @@ class WhatsappChat(models.TransientModel):
         
         return f'''
         <div class="message-bubble" 
-             style="background: {bubble_background}; padding: 10px; margin: 8px 0; border-radius: 18px; position: relative; max-width: 80%; {bubble_align} border: 1px solid #ddd;">
-            <div style="margin-bottom: 5px;">
+             style="background: {bubble_background}; font-size: 13px; max-width: 65%; padding: 4px 12px; line-height: 1.4; position: relative; margin: 8px 0; border-radius: 7.5px; position: relative; {bubble_align} box-shadow: 0 1px 0.5px rgba(0,0,0,0.1);">
+            <div style="">
                 <strong style="color: {status_color};">{'You' if is_sent_by_me else contact_name}</strong>
-                <small style="color: #666; float: right;">{msg_date_display}</small>
+                <small style="color: #666; float: right; font-size: 12px;">{msg_date_display}</small>
             </div>
-            <div style="margin-bottom: 8px; word-wrap: break-word;">
+            <div style="word-wrap: break-word;">
                 {content}
             </div>
             <div style="text-align: right; font-size: 12px; color: {status_color};">

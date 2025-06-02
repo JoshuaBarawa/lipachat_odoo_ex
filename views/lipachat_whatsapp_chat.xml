@@ -29,7 +29,7 @@
                                     <field name="messages_html" widget="html" nolabel="1" class="o_whatsapp_messages_html"/>
                                 </div>
                                 <div class="chat-input-container">
-                                    <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/>   
+                                    <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="char" no_label="1"/>  
                                      <div class="btn btn-primary o_whatsapp_send_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
                                         <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send
                                     </div>
