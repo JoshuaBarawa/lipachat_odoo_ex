@@ -87,6 +87,21 @@ class LipachatMessage(models.Model):
     response_data = fields.Text('API Response')
     sent_contacts = fields.Text('Sent To', readonly=True)
     failed_contacts = fields.Text('Failed To', readonly=True)
+    
+    # Computed field for truncated message display
+    message_text_short = fields.Char('Content Preview', compute='_compute_message_text_short', store=False)
+
+    @api.depends('message_text')
+    def _compute_message_text_short(self):
+        for record in self:
+            if record.message_text:
+                # Truncate to 50 characters and add ellipsis if longer
+                if len(record.message_text) > 50:
+                    record.message_text_short = record.message_text[:50] + '...'
+                else:
+                    record.message_text_short = record.message_text
+            else:
+                record.message_text_short = ''
 
     @api.constrains('partner_id', 'partner_ids', 'phone_number')
     def _check_recipients(self):

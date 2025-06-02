@@ -39,6 +39,13 @@
                     border-radius: 4px;
                     margin-bottom: 10px;
                 }
+                /* Truncate long content in tree view */
+                .o_list_view .o_data_cell[name="message_text"] {
+                    max-width: 200px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
             </style>
         </template>
 
@@ -149,7 +156,7 @@
                     <field name="partner_id" string="Contact"/>
                     <field name="phone_number" string="Phone Number"/>
                     <field name="message_type" string="Message Type"/>
-                    <field name="message_text" string="Content"/>
+                    <field name="message_text_short" string="Content"/>
                     <field name="state" string="Status"/>
                     <!-- <field name="bulk_parent_id" invisible="1"/>
                     <field name="is_bulk_template" invisible="1"/> -->
