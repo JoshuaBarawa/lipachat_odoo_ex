@@ -22,27 +22,9 @@ class WhatsappChat(models.TransientModel):
     @api.model
     def create(self, vals):
         """
-        Overrides the create method to automatically select the most recent
-        contact when the chat interface is opened (i.e., a new transient
-        record is created).
+        Simplified create method - let JavaScript handle contact selection for faster loading
         """
-        res = super().create(vals)
-        if not res.contact_partner_id:
-            # Find the most recent message to determine the default selected contact
-            most_recent_message = self.env['lipachat.message'].search([
-                ('is_bulk_template', '=', False),
-                ('partner_id', '!=', False)
-            ], order='create_date desc', limit=1)
-            
-            if most_recent_message and most_recent_message.partner_id:
-                # Update the new transient record with the most recent contact's info
-                res.write({
-                    'contact_partner_id': most_recent_message.partner_id.id,
-                    'contact': most_recent_message.partner_id.name,
-                    # No need to set last_refresh here for initial load as computes will run
-                })
-                _logger.info(f"Automatically selected contact: {most_recent_message.partner_id.name} (ID: {most_recent_message.partner_id.id}) on chat load.")
-        return res
+        return super().create(vals)
 
     @api.depends('contact_partner_id', 'last_refresh')
     def _compute_contacts_html(self):
@@ -457,4 +439,42 @@ class WhatsappChat(models.TransientModel):
                 '''
         html += '</div>'
         return html
+    
+
+    @api.model
+    def get_most_recent_contact(self):
+        """
+        New RPC method to immediately get the most recent contact for faster initialization
+        """
+        most_recent_message = self.env['lipachat.message'].search([
+            ('is_bulk_template', '=', False),
+            ('partner_id', '!=', False)
+        ], order='create_date desc', limit=1)
+        
+        if most_recent_message and most_recent_message.partner_id:
+            return {
+                'partner_id': most_recent_message.partner_id.id,
+                'name': most_recent_message.partner_id.name
+            }
+        
+        return {}
+    
+    @api.model
+    def get_initial_chat_data(self):
+        """Returns both recent contact and messages in one call for faster initialization"""
+        most_recent = self.get_most_recent_contact()
+        if not most_recent:
+            return {
+                'contacts_html': self.rpc_get_contacts_html(),
+                'messages_html': '',
+                'partner_id': False
+            }
+        
+        return {
+            'partner_id': most_recent['partner_id'],
+            'partner_name': most_recent['name'],
+            'contacts_html': self.rpc_get_contacts_html(),
+            'messages_html': self.rpc_get_messages_html(most_recent['partner_id'])
+        }
+
     

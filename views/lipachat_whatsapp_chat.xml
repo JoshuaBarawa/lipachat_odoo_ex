@@ -7,7 +7,7 @@
             <field name="arch" type="xml">
                 <form string="WhatsApp Chat Interface" create="false" edit="false" delete="false">
                     <sheet>
-                    
+                      
                          <!-- Hidden fields for state management -->
                         <field name="contact" invisible="1"/>
                         <field name="contact_partner_id" invisible="1"/>
