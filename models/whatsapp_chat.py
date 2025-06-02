@@ -178,11 +178,21 @@ class WhatsappChat(models.TransientModel):
 
         content = "Unsupported Message Type"
         if msg_data['message_type'] == 'text':
-            content = msg_data['message_text'] or 'Empty message'
+            # Convert line breaks to HTML <br> tags and escape HTML
+            message_text = msg_data['message_text'] or 'Empty message'
+            # First escape HTML entities to prevent XSS
+            import html
+            escaped_text = html.escape(message_text)
+            # Then convert line breaks to <br> tags
+            content = escaped_text.replace('\n', '<br>')
         elif msg_data['message_type'] == 'media':
             content = f"📎 {msg_data['media_type'].title()} Media"
             if msg_data['caption']:
-                content += f": {msg_data['caption']}"
+                # Also handle line breaks in captions
+                import html
+                escaped_caption = html.escape(msg_data['caption'])
+                formatted_caption = escaped_caption.replace('\n', '<br>')
+                content += f": {formatted_caption}"
         elif msg_data['message_type'] == 'template':
             content = f"📋 Template: {msg_data['template_name']}"
 
@@ -192,17 +202,17 @@ class WhatsappChat(models.TransientModel):
         
         return f'''
         <div class="message-bubble" 
-             style="background: {bubble_background}; font-size: 13px; max-width: 65%; padding: 4px 12px; line-height: 1.4; position: relative; margin: 8px 0; border-radius: 7.5px; position: relative; {bubble_align} box-shadow: 0 1px 0.5px rgba(0,0,0,0.1);">
+            style="background: {bubble_background}; font-size: 13px; max-width: 65%; padding: 4px 12px; line-height: 1.4; position: relative; margin: 8px 0; border-radius: 7.5px; position: relative; {bubble_align} box-shadow: 0 1px 0.5px rgba(0,0,0,0.1);">
             <div style="">
                 <strong style="color: {status_color};">{'You' if is_sent_by_me else contact_name}</strong>
                 <small style="color: #666; float: right; font-size: 12px;">{msg_date_display}</small>
             </div>
-            <div style="word-wrap: break-word;">
+            <div style="word-wrap: break-word; white-space: normal;">
                 {content}
             </div>
             <div style="text-align: right; font-size: 12px; color: {status_color};">
                 <span title="{msg_data['state'].title()}">{status_icon} {msg_data['state'].title()}</span>
-                {f'<br><span style="color: #dc3545; font-size: 11px;">Error: {msg_data["error_message"]}</span>' if msg_data["state"] == 'failed' and msg_data["error_message"] else ''}
+                {f'<br><span style="color: #dc3545; font-size: 11px;">Error: {html.escape(msg_data["error_message"])}</span>' if msg_data["state"] == 'failed' and msg_data["error_message"] else ''}
             </div>
         </div>
         '''
