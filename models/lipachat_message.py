@@ -45,8 +45,6 @@ class LipachatMessage(models.Model):
     message_type = fields.Selection([
         ('text', 'Text Message'),
         ('media', 'Media Message'),
-        ('buttons', 'Interactive Buttons'),
-        ('list', 'Interactive List'),
         ('template', 'Template Message'),
     ], 'Message Type', required=True, default='text')
     
@@ -270,7 +268,7 @@ class LipachatMessage(models.Model):
         }
         
         response = requests.post(
-            f"{config.api_url}/whatsapp/media",
+            f"{config.api_base_url}/whatsapp/media",
             headers=headers,
             json=data,
             timeout=30
@@ -290,7 +288,7 @@ class LipachatMessage(models.Model):
         }
         
         response = requests.post(
-            f"{config.api_url}/whatsapp/interactive/buttons",
+            f"{config.api_base_url}/whatsapp/interactive/buttons",
             headers=headers,
             json=data,
             timeout=30
@@ -312,7 +310,7 @@ class LipachatMessage(models.Model):
         }
         
         response = requests.post(
-            f"{config.api_url}/whatsapp/interactive/list",
+            f"{config.api_base_url}/whatsapp/interactive/list",
             headers=headers,
             json=data,
             timeout=30
@@ -335,7 +333,7 @@ class LipachatMessage(models.Model):
         }
         
         response = requests.post(
-            f"{config.api_url}/whatsapp/template",
+            f"{config.api_base_url}/whatsapp/template",
             headers=headers,
             json=data,
             timeout=30

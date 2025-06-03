@@ -10,8 +10,6 @@
         This module integrates Odoo with LipaChat WhatsApp Gateway API to:
         * Send text messages
         * Send media messages (images, videos, documents)
-        * Send interactive buttons
-        * Send interactive lists
         * Create and manage message templates
         * Track message delivery status
         

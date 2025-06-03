@@ -117,22 +117,6 @@
                                     <field name="media_url" readonly="state != 'draft'"/>
                                     <field name="caption" readonly="state != 'draft'"/>
                                 </group>
-
-                                <!-- Interactive Buttons Section -->
-                                <group string="Interactive Buttons" invisible="message_type != 'buttons'">
-                                    <field name="body_text" readonly="state != 'draft'"/>
-                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" 
-                                        nolabel="1" readonly="state != 'draft'"/>
-                                </group>
-
-                                 <!-- Interactive List Section -->
-                                <group string="Interactive List" invisible="message_type != 'list'">
-                                    <field name="header_text" readonly="state != 'draft'"/>
-                                    <field name="body_text" readonly="state != 'draft'"/>
-                                    <field name="button_text" readonly="state != 'draft'"/>
-                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" 
-                                        nolabel="1" readonly="state != 'draft'"/>
-                                </group>
                                 
                                 <!-- Template Message Section -->
                                 <group string="Template Message" invisible="message_type != 'template'">
