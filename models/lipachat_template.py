@@ -59,7 +59,7 @@ class LipachatTemplate(models.Model):
     
     # Body component
     body_text = fields.Text('Body Text', required=True)
-    body_examples = fields.Text('Body Examples (JSON)', help="JSON array of example values for variables like {{1}}, {{2}}")
+    body_examples = fields.Text('Body Examples', help="Array of example values for variables like {{1}}, {{2}}")
     
     # Footer component (optional)
     footer_text = fields.Char('Footer Text')
@@ -76,12 +76,12 @@ class LipachatTemplate(models.Model):
         ('URL', 'URL'),
         ('PHONE_NUMBER', 'Phone Number'),
         ('OTP', 'OTP (Authentication only)')
-    ], 'Button 1 Type')
-    button_1_text = fields.Char('Button 1 Text')
-    button_1_url = fields.Char('Button 1 URL')
-    button_1_url_example = fields.Char('Button 1 URL Example')
-    button_1_phone_number = fields.Char('Button 1 Phone Number')
-    button_1_phone_example = fields.Char('Button 1 Phone Example')
+    ], 'Type')
+    button_1_text = fields.Char('Text')
+    button_1_url = fields.Char('URL')
+    button_1_url_example = fields.Char('URL Example')
+    button_1_phone_number = fields.Char('Phone Number')
+    button_1_phone_example = fields.Char('Phone Example')
     button_1_otp_type = fields.Selection([
         ('COPY_CODE', 'Copy Code'),
         ('ONE_TAP', 'One Tap')
@@ -92,12 +92,12 @@ class LipachatTemplate(models.Model):
         ('URL', 'URL'),
         ('PHONE_NUMBER', 'Phone Number'),
         ('OTP', 'OTP (Authentication only)')
-    ], 'Button 2 Type')
-    button_2_text = fields.Char('Button 2 Text')
-    button_2_url = fields.Char('Button 2 URL')
-    button_2_url_example = fields.Char('Button 2 URL Example')
-    button_2_phone_number = fields.Char('Button 2 Phone Number')
-    button_2_phone_example = fields.Char('Button 2 Phone Example')
+    ], 'Type')
+    button_2_text = fields.Char('Text')
+    button_2_url = fields.Char('URL')
+    button_2_url_example = fields.Char('URL Example')
+    button_2_phone_number = fields.Char('Phone Number')
+    button_2_phone_example = fields.Char('Phone Example')
     button_2_otp_type = fields.Selection([
         ('COPY_CODE', 'Copy Code'),
         ('ONE_TAP', 'One Tap')
@@ -108,12 +108,12 @@ class LipachatTemplate(models.Model):
         ('URL', 'URL'),
         ('PHONE_NUMBER', 'Phone Number'),
         ('OTP', 'OTP (Authentication only)')
-    ], 'Button 3 Type')
-    button_3_text = fields.Char('Button 3 Text')
-    button_3_url = fields.Char('Button 3 URL')
-    button_3_url_example = fields.Char('Button 3 URL Example')
-    button_3_phone_number = fields.Char('Button 3 Phone Number')
-    button_3_phone_example = fields.Char('Button 3 Phone Example')
+    ], 'Type')
+    button_3_text = fields.Char('Text')
+    button_3_url = fields.Char('URL')
+    button_3_url_example = fields.Char('URL Example')
+    button_3_phone_number = fields.Char('Phone Number')
+    button_3_phone_example = fields.Char('Phone Example')
     button_3_otp_type = fields.Selection([
         ('COPY_CODE', 'Copy Code'),
         ('ONE_TAP', 'One Tap')

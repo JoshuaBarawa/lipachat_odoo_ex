@@ -50,7 +50,7 @@
                         </div>
 
 
-                         <!-- Upload Status Indicators -->
+                         <!-- Upload Media Status Indicators -->
                         <div invisible="upload_status != 'uploading' or header_type == 'TEXT' or not header_type" class="alert alert-info media-status-indicators" >
                             <i class="fa fa-spinner fa-spin"/> Uploading media, please wait...
                         </div>
@@ -68,16 +68,17 @@
                         
                         
                         <!-- Body Section -->
-                        <group string="Body" class="mt16">
-                            <field name="body_text" nolabel="1" 
-                                   placeholder="Enter your message (use {{1}}, {{2}} for variables)"
-                                   invisible="category == 'AUTHENTICATION'"/>
-                            <field name="body_examples" 
-                                   placeholder='["Example 1", "Example 2"] - JSON array for variables {{1}}, {{2}}'
-                                   invisible="category == 'AUTHENTICATION'"/>
-                            <field name="add_security_recommendation" 
-                                   invisible="category != 'AUTHENTICATION'"/>
-                        </group>
+                         <group string="Body" class="mt16">   
+                                <field name="body_text" nolabel="1" placeholder="Enter your message (use {{1}}, {{2}} for variables)"
+                                    invisible="category == 'AUTHENTICATION'" class="body-message-field"/><br/>
+                         </group>
+                          <group class="mt16">   
+                                <field name="body_examples" placeholder='i.e ["Example 1", "Example 2"]' invisible="category == 'AUTHENTICATION'"/>
+                         </group>
+                          <group>   
+                                <field name="add_security_recommendation" invisible="category != 'AUTHENTICATION'"/>
+                         </group>
+
                         
                         <!-- Footer Section -->
                         <group string="Footer (Optional)" class="mt16">
@@ -89,74 +90,41 @@
                         
                         <!-- Buttons Section -->
                         <group string="Buttons (Optional, max 3)" class="mt16">
-                            <h2 class="button-count-titles">Button 1</h2>
-                            <group>
+                            
+                            <group string="Button 1" class="mt16">
                                 <field name="button_1_type"/>
-                                <field name="button_1_text" placeholder="Button text"
-                                       invisible="not button_1_type"/> 
-                                <field name="button_1_url" 
-                                       invisible="button_1_type != 'URL'" 
-                                       placeholder="https://example.com"/>
-                                <field name="button_1_url_example" 
-                                       invisible="button_1_type != 'URL'" 
-                                       placeholder="Example URL for variables"/>
-                                <field name="button_1_phone_number" 
-                                       invisible="button_1_type != 'PHONE_NUMBER'" 
-                                       widget="phone" placeholder="+254712345678"/>
-                                <field name="button_1_phone_example" 
-                                       invisible="button_1_type != 'PHONE_NUMBER'" 
-                                       placeholder="Example phone for variables"/>
-                                <field name="button_1_otp_type" 
-                                       invisible="button_1_type != 'OTP'"/>
+                                <field name="button_1_text" placeholder="Button text" invisible="not button_1_type"/> 
+                                <field name="button_1_url"  invisible="button_1_type != 'URL'" placeholder="https://example.com"/>
+                                <field name="button_1_url_example" invisible="button_1_type != 'URL'" placeholder="Example URL for variables"/>
+                                <field name="button_1_phone_number" invisible="button_1_type != 'PHONE_NUMBER'" widget="phone" placeholder="+254712345678"/>
+                                <field name="button_1_phone_example" invisible="button_1_type != 'PHONE_NUMBER'" placeholder="Example phone for variables"/>
+                                <field name="button_1_otp_type" invisible="button_1_type != 'OTP'"/>
                             </group>
-                            
-                            <h2 class="button-count-titles">Button 2</h2>
-                            <group>
+                                 
+                            <group string="Button 2" class="mt16">
                                 <field name="button_2_type"/>
-                                <field name="button_2_text" placeholder="Button text"
-                                       invisible="not button_2_type"/>
-                                <field name="button_2_url" 
-                                       invisible="button_2_type != 'URL'" 
-                                       placeholder="https://example.com"/>
-                                <field name="button_2_url_example" 
-                                       invisible="button_2_type != 'URL'" 
-                                       placeholder="Example URL for variables"/>
-                                <field name="button_2_phone_number" 
-                                       invisible="button_2_type != 'PHONE_NUMBER'" 
-                                       widget="phone" placeholder="+254712345678"/>
-                                <field name="button_2_phone_example" 
-                                       invisible="button_2_type != 'PHONE_NUMBER'" 
-                                       placeholder="Example phone for variables"/>
-                                <field name="button_2_otp_type" 
-                                       invisible="button_2_type != 'OTP'"/>
+                                <field name="button_2_text" placeholder="Button text" invisible="not button_2_type"/>
+                                <field name="button_2_url" invisible="button_2_type != 'URL'" placeholder="https://example.com"/>
+                                <field name="button_2_url_example" invisible="button_2_type != 'URL'" placeholder="Example URL for variables"/>
+                                <field name="button_2_phone_number" invisible="button_2_type != 'PHONE_NUMBER'" widget="phone" placeholder="+254712345678"/>
+                                <field name="button_2_phone_example" invisible="button_2_type != 'PHONE_NUMBER'" placeholder="Example phone for variables"/>
+                                <field name="button_2_otp_type" invisible="button_2_type != 'OTP'"/>
                             </group>
                             
-                            <h2 class="button-count-titles">Button 3</h2>
-                            <group>
+                            
+                            <group string="Button 3" class="mt16">
                                 <field name="button_3_type"/>
-                                <field name="button_3_text" placeholder="Button text"
-                                       invisible="not button_3_type"/>
-                                <field name="button_3_url" 
-                                       invisible="button_3_type != 'URL'" 
-                                       placeholder="https://example.com"/>
-                                <field name="button_3_url_example" 
-                                       invisible="button_3_type != 'URL'" 
-                                       placeholder="Example URL for variables"/>
-                                <field name="button_3_phone_number" 
-                                       invisible="button_3_type != 'PHONE_NUMBER'" 
-                                       widget="phone" placeholder="+254712345678"/>
-                                <field name="button_3_phone_example" 
-                                       invisible="button_3_type != 'PHONE_NUMBER'" 
-                                       placeholder="Example phone for variables"/>
-                                <field name="button_3_otp_type" 
-                                       invisible="button_3_type != 'OTP'"/>
+                                <field name="button_3_text" placeholder="Button text" invisible="not button_3_type"/>
+                                <field name="button_3_url" invisible="button_3_type != 'URL'" placeholder="https://example.com"/>
+                                <field name="button_3_url_example" invisible="button_3_type != 'URL'" placeholder="Example URL for variables"/>
+                                <field name="button_3_phone_number" invisible="button_3_type != 'PHONE_NUMBER'" widget="phone" placeholder="+254712345678"/>
+                                <field name="button_3_phone_example" invisible="button_3_type != 'PHONE_NUMBER'" placeholder="Example phone for variables"/>
+                                <field name="button_3_otp_type" invisible="button_3_type != 'OTP'"/>
                             </group>
                         </group>
 
-                        <!-- Component Data Preview -->
-                        <group string="Generated Component Data (Preview)" class="mt16">
-                            <field name="component_data" widget="ace" options="{'mode': 'json'}" readonly="1"/>
-                        </group>
+
+                        
                     </sheet>
                 </form>
             </field>

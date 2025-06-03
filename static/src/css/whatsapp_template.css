@@ -24,3 +24,6 @@
     width: max-content;
 }
 
+.body-message-field{
+    width: 90vw !important;
+}
