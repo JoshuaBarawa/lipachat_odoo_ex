@@ -11,3 +11,16 @@
     font-size: 14px;
     font-weight: 600;
 }
+
+.supported-media{
+    width: max-content;
+}
+
+.header-media-sec{
+    width: max-content;
+}
+
+.media-status-indicators{
+    width: max-content;
+}
+

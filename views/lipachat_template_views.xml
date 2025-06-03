@@ -9,8 +9,7 @@
                 <form string="WhatsApp Template">
                     <header>
                         <button name="create_template" string="Create Template" type="object" 
-                                class="btn-primary" 
-                                invisible="header_type != 'TEXT' and header_type and not header_media_id"/>
+                                class="btn-primary"/>
                         <field name="status" widget="statusbar" statusbar_visible="draft,submitted,approved,rejected"/>
                     </header>
                     <sheet>
@@ -27,67 +26,46 @@
                         </group>
                         
                         <!-- Header Section -->
-                        <group string="Header (Optional)" class="mt16">
+                        <group string="Header" class="mt16">
                             <field name="header_type"/>
                             <field name="header_text" invisible="header_type != 'TEXT'" 
                                    placeholder="Enter header text (use {{1}}, {{2}} for variables)"/>
                             <field name="header_example" invisible="header_type != 'TEXT'" 
                                    placeholder="Example value for {{1}}"/>
-                            
-                            <!-- Media Upload Section -->
-                            <div invisible="header_type == 'TEXT' or not header_type">
-                                <group>
-                                    <!-- File upload field - always visible when media type is selected -->
+                         </group>
+
+                        <!-- Media Upload Section -->
+                        <div invisible="header_type == 'TEXT' or not header_type" class="header-media-sec">
+                            <group>
+                                <!-- File upload field - always visible when media type is selected -->
                                     <field name="header_media" filename="header_media_filename"
-                                           invisible="header_type == 'TEXT' or not header_type"/>
+                                            invisible="header_type == 'TEXT' or not header_type"/>
                                     <field name="header_media_filename" invisible="1"/>
-                                    
-                                    <!-- Hidden fields for upload status -->
-                                    <field name="is_uploading_media" invisible="1"/>
-                                    <field name="upload_status" invisible="1"/>
-                                    <field name="upload_error_message" invisible="1"/>
-                                    
-                                    <!-- Upload Status Indicators -->
-                                    <div invisible="upload_status != 'uploading'" class="alert alert-info">
-                                        <i class="fa fa-spinner fa-spin"/> Uploading media, please wait...
-                                    </div>
-                                    
-                                    <div invisible="upload_status != 'success'" class="alert alert-success">
-                                        <i class="fa fa-check-circle"/> Media uploaded successfully! 
-                                        <strong>Media ID:</strong> <field name="header_media_id" readonly="1" class="oe_inline"/>
-                                        <br/>
-                                        <button name="clear_media" string="Change Media" type="object" 
-                                                class="btn btn-sm btn-warning mt8" icon="fa-refresh"/>
-                                    </div>
-                                    
-                                    <div invisible="upload_status != 'error'" class="alert alert-danger">
-                                        <i class="fa fa-exclamation-triangle"/> Upload failed: 
-                                        <span invisible="not upload_error_message">
-                                            <field name="upload_error_message" readonly="1" class="oe_inline"/>
-                                        </span>
-                                        <br/>
-                                        <button name="retry_upload" string="Retry Upload" type="object" 
-                                                class="btn btn-sm btn-primary mt8" icon="fa-refresh"/>
-                                        <button name="clear_media" string="Change Media" type="object" 
-                                                class="btn btn-sm btn-warning mt8" icon="fa-times"/>
-                                    </div>
-                                    
-                                    <!-- Info message for new uploads -->
-                                    <div invisible="header_media or upload_status != 'none'" class="alert alert-info">
-                                        <i class="fa fa-info-circle"/> Select a media file and it will be uploaded automatically.
-                                        <br/>
-                                        <small>
-                                            <strong>Supported formats:</strong>
-                                            <ul>
-                                                <li invisible="header_type != 'IMAGE'">Images: JPG, PNG, GIF, WebP (max 5MB)</li>
-                                                <li invisible="header_type != 'VIDEO'">Videos: MP4, 3GPP (max 16MB)</li>
-                                                <li invisible="header_type != 'DOCUMENT'">Documents: PDF, DOC, DOCX, TXT, etc. (max 100MB)</li>
-                                            </ul>
-                                        </small>
-                                    </div>
-                                </group>
-                            </div>
-                        </group>
+                                
+                                <!-- Hidden fields for upload status -->
+                                <field name="is_uploading_media" invisible="1"/>
+                                <field name="upload_status" invisible="1"/>
+                                <field name="upload_error_message" invisible="1"/>
+                            </group>
+                        </div>
+
+
+                         <!-- Upload Status Indicators -->
+                        <div invisible="upload_status != 'uploading' or header_type == 'TEXT' or not header_type" class="alert alert-info media-status-indicators" >
+                            <i class="fa fa-spinner fa-spin"/> Uploading media, please wait...
+                        </div>
+                        
+                        <div invisible="upload_status != 'success' or header_type == 'TEXT' or not header_type" class="alert alert-success media-status-indicators">
+                            <i class="fa fa-check-circle"/> Media uploaded successfully! 
+                        </div>
+                        
+                        <div invisible="upload_status != 'error' or header_type == 'TEXT' or not header_type" class="alert alert-danger media-status-indicators">
+                            <i class="fa fa-exclamation-triangle"/> Upload failed
+                            <p invisible="not upload_error_message">
+                                <field name="upload_error_message" readonly="1"/>
+                            </p>
+                        </div>
+                        
                         
                         <!-- Body Section -->
                         <group string="Body" class="mt16">
