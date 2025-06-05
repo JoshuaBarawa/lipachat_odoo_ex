@@ -527,6 +527,28 @@ class LipachatTemplate(models.Model):
                             )
                     except (json.JSONDecodeError, ValueError):
                         raise ValidationError(_('Body examples must be valid JSON array'))
+                    
+                    
+    @api.onchange('button_1_phone_number', 'button_2_phone_number', 'button_3_phone_number')
+    def _onchange_button_phone_numbers(self):
+        """Auto-populate phone example fields with main phone values"""
+        if self.button_1_phone_number:
+            self.button_1_phone_example = self.button_1_phone_number
+        if self.button_2_phone_number:
+            self.button_2_phone_example = self.button_2_phone_number
+        if self.button_3_phone_number:
+            self.button_3_phone_example = self.button_3_phone_number
+
+    @api.onchange('button_1_url', 'button_2_url', 'button_3_url')
+    def _onchange_button_urls(self):
+        """Auto-populate URL example fields with main URL values"""
+        if self.button_1_url:
+            self.button_1_url_example = self.button_1_url
+        if self.button_2_url:
+            self.button_2_url_example = self.button_2_url
+        if self.button_3_url:
+            self.button_3_url_example = self.button_3_url
+            
     
     @api.constrains('category', 'button_1_type', 'button_2_type', 'button_3_type')
     def _check_authentication_buttons(self):

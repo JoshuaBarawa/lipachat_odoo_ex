@@ -95,9 +95,9 @@
                                 <field name="button_1_type"/>
                                 <field name="button_1_text" placeholder="Button text" invisible="not button_1_type"/> 
                                 <field name="button_1_url"  invisible="button_1_type != 'URL'" placeholder="https://example.com"/>
-                                <field name="button_1_url_example" invisible="button_1_type != 'URL'" placeholder="Example URL for variables"/>
-                                <field name="button_1_phone_number" invisible="button_1_type != 'PHONE_NUMBER'" widget="phone" placeholder="+254712345678"/>
-                                <field name="button_1_phone_example" invisible="button_1_type != 'PHONE_NUMBER'" placeholder="Example phone for variables"/>
+                                <field name="button_1_url_example" invisible="1"/>
+                                <field name="button_1_phone_number" invisible="button_1_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
+                                <field name="button_1_phone_example" invisible="1"/>
                                 <field name="button_1_otp_type" invisible="button_1_type != 'OTP'"/>
                             </group>
                                  
@@ -105,9 +105,9 @@
                                 <field name="button_2_type"/>
                                 <field name="button_2_text" placeholder="Button text" invisible="not button_2_type"/>
                                 <field name="button_2_url" invisible="button_2_type != 'URL'" placeholder="https://example.com"/>
-                                <field name="button_2_url_example" invisible="button_2_type != 'URL'" placeholder="Example URL for variables"/>
-                                <field name="button_2_phone_number" invisible="button_2_type != 'PHONE_NUMBER'" widget="phone" placeholder="+254712345678"/>
-                                <field name="button_2_phone_example" invisible="button_2_type != 'PHONE_NUMBER'" placeholder="Example phone for variables"/>
+                                <field name="button_2_url_example" invisible="1"/>
+                                <field name="button_2_phone_number" invisible="button_2_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
+                                <field name="button_2_phone_example" invisible="1"/>
                                 <field name="button_2_otp_type" invisible="button_2_type != 'OTP'"/>
                             </group>
                             
@@ -116,9 +116,9 @@
                                 <field name="button_3_type"/>
                                 <field name="button_3_text" placeholder="Button text" invisible="not button_3_type"/>
                                 <field name="button_3_url" invisible="button_3_type != 'URL'" placeholder="https://example.com"/>
-                                <field name="button_3_url_example" invisible="button_3_type != 'URL'" placeholder="Example URL for variables"/>
-                                <field name="button_3_phone_number" invisible="button_3_type != 'PHONE_NUMBER'" widget="phone" placeholder="+254712345678"/>
-                                <field name="button_3_phone_example" invisible="button_3_type != 'PHONE_NUMBER'" placeholder="Example phone for variables"/>
+                                <field name="button_3_url_example" invisible="1"/>
+                                <field name="button_3_phone_number" invisible="button_3_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
+                                <field name="button_3_phone_example" invisible="1"/>
                                 <field name="button_3_otp_type" invisible="button_3_type != 'OTP'"/>
                             </group>
                         </group>
