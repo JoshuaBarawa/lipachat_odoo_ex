@@ -85,12 +85,9 @@
                         <group string="Footer (Optional)" class="mt16" invisible="category == 'AUTHENTICATION'">
                             <field name="footer_text" placeholder="Enter footer text..."
                                    invisible="category == 'AUTHENTICATION'"/>
+                            <field name="code_expiration_minutes" invisible="category != 'AUTHENTICATION'"/>
                         </group>
 
-                        <!-- Code Expiration Section -->
-                         <group string="Code Expiration" class="mt16" invisible="category != 'AUTHENTICATION'">
-                            <field name="code_expiration_minutes" />
-                        </group>
                         
                         <!-- Buttons Section -->
                         <group string="Buttons (Optional, max 3)" class="mt16" invisible="category == 'AUTHENTICATION'">

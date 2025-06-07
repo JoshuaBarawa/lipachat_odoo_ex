@@ -68,9 +68,8 @@ class LipachatMessage(models.Model):
     buttons_data = fields.Text('Buttons Data (JSON)')
     
     # Template fields
-    template_name = fields.Char('Template Name')
-    template_language = fields.Char('Template Language', default='en')
-    template_data = fields.Text('Template Data (JSON)')
+    template_name = fields.Many2one('lipachat.template', string='Template')
+    template_data = fields.Text(related='template_id.data', store=True, readonly=True)
     
     # Status fields
     state = fields.Selection([
@@ -327,7 +326,7 @@ class LipachatMessage(models.Model):
             "from": self.from_number or config.default_from_number,
             "template": {
                 "name": self.template_name,
-                "languageCode": self.template_language,
+                "languageCode": "en",
                 "components": template_data
             }
         }
@@ -396,5 +395,4 @@ class LipachatMessage(models.Model):
                 record.buttons_data = False
             if record.message_type != 'template':
                 record.template_name = False
-                record.template_language = 'en'
                 record.template_data = False

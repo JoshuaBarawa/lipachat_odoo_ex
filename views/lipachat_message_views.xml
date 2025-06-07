@@ -120,10 +120,13 @@
                                 
                                 <!-- Template Message Section -->
                                 <group string="Template Message" invisible="message_type != 'template'">
-                                    <field name="template_name" readonly="state != 'draft'"/>
-                                    <field name="template_language" readonly="state != 'draft'"/>
-                                    <field name="template_data" widget="ace" options="{'mode': 'json'}" 
+
+                                   <!-- <field name="template_id"/> -->
+                                    <field name="template_name" placeholder="Select a template..."
                                         readonly="state != 'draft'"/>
+                                     <!-- 
+                                    <field name="template_data" widget="ace" options="{'mode': 'json'}" 
+                                        readonly="state != 'draft'"/> -->
                                 </group>
 
                             </page>
