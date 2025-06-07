@@ -26,7 +26,7 @@ class LipachatTemplate(models.Model):
         ('MARKETING', 'Marketing'),
         ('UTILITY', 'Utility'),
         ('AUTHENTICATION', 'Authentication')
-    ], 'Category', required=True, default='UTILITY')
+    ], 'Category', required=True, default='MARKETING')
     
     phone_number = fields.Char('Phone Number', required=True)
     status = fields.Selection([
@@ -58,7 +58,7 @@ class LipachatTemplate(models.Model):
     upload_error_message = fields.Text('Upload Error Message')
     
     # Body component
-    body_text = fields.Text('Body Text', required=True)
+    body_text = fields.Text('Body Text')
     body_examples = fields.Text('Body Examples', help="Array of example values for variables like {{1}}, {{2}}")
     
     # Footer component (optional)
@@ -120,6 +120,12 @@ class LipachatTemplate(models.Model):
     ], 'OTP Type', default='COPY_CODE')
     
     component_data = fields.Text('Component Data (JSON)', compute='_compute_component_data', store=True)
+
+    @api.constrains('category', 'body_text')
+    def _check_body_text_requirements(self):
+        for record in self:
+            if record.category != 'AUTHENTICATION' and not record.body_text:
+                raise ValidationError(_('Body text is required for %s templates') % record.category)
     
     @api.onchange('header_media', 'header_media_filename')
     def _onchange_header_media(self):
@@ -570,6 +576,8 @@ class LipachatTemplate(models.Model):
             if record.header_type and record.header_type != 'TEXT' and not record.header_media_id:
                 raise ValidationError(_('Media ID is required for %s header type. Please upload media first.') % record.header_type)
     
+
+    
     def create_template(self):
         """Create template via API"""
         config = self.env['lipachat.config'].get_active_config()
@@ -579,12 +587,44 @@ class LipachatTemplate(models.Model):
             'Content-Type': 'application/json'
         }
         
-        data = {
-            'name': self.name,
-            'language': self.language,
-            'category': self.category,
-            'component': json.loads(self.component_data)
-        }
+        # Use different data structure for AUTHENTICATION category
+        if self.category == 'AUTHENTICATION':
+            component_data = {
+                "body": {},
+                "buttons": []
+            }
+            
+            # Add optional body settings
+            if self.add_security_recommendation:
+                component_data["body"]["addSecurityRecommendation"] = True
+                
+            # Add optional footer settings
+            if self.code_expiration_minutes:
+                component_data["footer"] = {
+                    "codeExpirationMinutes": self.code_expiration_minutes
+                }
+             
+            button_data = {
+                "type": "OTP",
+                "text": "Copy Code",
+                "otpType": "COPY_CODE",
+            }
+            component_data["buttons"].append(button_data)
+            
+            data = {
+                'name': self.name,
+                'language': self.language,
+                'category': self.category,
+                'component': component_data
+            }
+        else:
+            # Use existing structure for other categories
+            data = {
+                'name': self.name,
+                'language': self.language,
+                'category': self.category,
+                'component': json.loads(self.component_data)
+            }
         
         try:
             response = requests.post(
@@ -611,6 +651,8 @@ class LipachatTemplate(models.Model):
                     error_data = response.json()
                     if 'message' in error_data:
                         error_msg = error_data['message']
+                    if 'errors' in error_data:
+                        error_msg += f"\nDetails: {error_data['errors']}"
                 except:
                     pass
                 raise ValidationError(_('Failed to create template: %s') % error_msg)

@@ -7,6 +7,7 @@
             <field name="model">lipachat.template</field>
             <field name="arch" type="xml">
                 <form string="WhatsApp Template">
+                
                     <header>
                         <button name="create_template" string="Create Template" type="object" 
                                 class="btn-primary"/>
@@ -26,7 +27,7 @@
                         </group>
                         
                         <!-- Header Section -->
-                        <group string="Header" class="mt16">
+                        <group string="Header" class="mt16" invisible="category == 'AUTHENTICATION'">
                             <field name="header_type"/>
                             <field name="header_text" invisible="header_type != 'TEXT'" 
                                    placeholder="Enter header text (use {{1}}, {{2}} for variables)"/>
@@ -65,7 +66,7 @@
                                 <field name="upload_error_message" readonly="1"/>
                             </p>
                         </div>
-                        
+                                                
                         
                         <!-- Body Section -->
                          <group string="Body" class="mt16">   
@@ -81,15 +82,18 @@
 
                         
                         <!-- Footer Section -->
-                        <group string="Footer (Optional)" class="mt16">
+                        <group string="Footer (Optional)" class="mt16" invisible="category == 'AUTHENTICATION'">
                             <field name="footer_text" placeholder="Enter footer text..."
                                    invisible="category == 'AUTHENTICATION'"/>
-                            <field name="code_expiration_minutes" 
-                                   invisible="category != 'AUTHENTICATION'"/>
+                        </group>
+
+                        <!-- Code Expiration Section -->
+                         <group string="Code Expiration" class="mt16" invisible="category != 'AUTHENTICATION'">
+                            <field name="code_expiration_minutes" />
                         </group>
                         
                         <!-- Buttons Section -->
-                        <group string="Buttons (Optional, max 3)" class="mt16">
+                        <group string="Buttons (Optional, max 3)" class="mt16" invisible="category == 'AUTHENTICATION'">
                             
                             <group string="Button 1" class="mt16">
                                 <field name="button_1_type"/>
