@@ -126,67 +126,6 @@ class LipachatTemplate(models.Model):
         for record in self:
             if record.category != 'AUTHENTICATION' and not record.body_text:
                 raise ValidationError(_('Body text is required for %s templates') % record.category)
-    
-    @api.onchange('header_media', 'header_media_filename')
-    def _onchange_header_media(self):
-        """Auto-upload media when file is selected - improved version"""
-        if self.header_media and self.header_media_filename and not self.header_media_id:
-            # Reset previous status
-            self.upload_status = 'uploading'
-            self.upload_error_message = False
-            self.is_uploading_media = True
-            
-            # Validate file type based on header type
-            if self.header_type and not self._validate_media_type():
-                self.upload_status = 'error'
-                self.upload_error_message = f'Invalid file type for {self.header_type} header. Please select an appropriate file.'
-                self.is_uploading_media = False
-                return
-            
-            # Check file size limits
-            try:
-                file_data = base64.b64decode(self.header_media)
-                file_size_mb = len(file_data) / (1024 * 1024)
-                
-                # Check size limits based on header type
-                size_limits = {
-                    'IMAGE': 5,     # 5MB for images
-                    'VIDEO': 16,    # 16MB for videos  
-                    'DOCUMENT': 100 # 100MB for documents
-                }
-                
-                max_size = size_limits.get(self.header_type, 5)
-                if file_size_mb > max_size:
-                    self.upload_status = 'error'
-                    self.upload_error_message = f'File size ({file_size_mb:.1f}MB) exceeds limit of {max_size}MB for {self.header_type} files.'
-                    self.is_uploading_media = False
-                    return
-                    
-            except Exception as e:
-                self.upload_status = 'error'
-                self.upload_error_message = f'Error processing file: {str(e)}'
-                self.is_uploading_media = False
-                return
-            
-            # Perform upload
-            try:
-                self._perform_media_upload()
-                # Upload was successful - no need to return notification here
-                # as the UI will show the success status
-            except ValidationError as ve:
-                self.upload_status = 'error'
-                error_msg = str(ve)
-                # Clean up the error message
-                if error_msg.startswith('ValidationError\n\n'):
-                    error_msg = error_msg.replace('ValidationError\n\n', '')
-                self.upload_error_message = error_msg.replace('\n', ' ').strip()
-                self.is_uploading_media = False
-                _logger.error(f'Media upload failed: {ve}')
-            except Exception as e:
-                self.upload_status = 'error'
-                self.upload_error_message = f'Unexpected error: {str(e)}'
-                self.is_uploading_media = False
-                _logger.error(f'Unexpected media upload error: {e}', exc_info=True)
 
     
     def _validate_media_type(self):
@@ -409,33 +348,118 @@ class LipachatTemplate(models.Model):
                         'type': 'danger',
                     }
                 }
+    
+    @api.onchange('header_media', 'header_media_filename')
+    def _onchange_header_media(self):
+        """Auto-upload media when file is selected - improved version"""
+        # Only process if we actually have new media and no existing media_id
+        if self.header_media and self.header_media_filename and not self.header_media_id:
+            # Reset previous status
+            self.upload_status = 'uploading'
+            self.upload_error_message = False
+            self.is_uploading_media = True
+            
+            # Validate file type based on header type
+            if self.header_type and not self._validate_media_type():
+                self.upload_status = 'error'
+                self.upload_error_message = f'Invalid file type for {self.header_type} header. Please select an appropriate file.'
+                self.is_uploading_media = False
+                return
+            
+            # Check file size limits
+            try:
+                file_data = base64.b64decode(self.header_media)
+                file_size_mb = len(file_data) / (1024 * 1024)
+                
+                # Check size limits based on header type
+                size_limits = {
+                    'IMAGE': 5,     # 5MB for images
+                    'VIDEO': 16,    # 16MB for videos  
+                    'DOCUMENT': 100 # 100MB for documents
+                }
+                
+                max_size = size_limits.get(self.header_type, 5)
+                if file_size_mb > max_size:
+                    self.upload_status = 'error'
+                    self.upload_error_message = f'File size ({file_size_mb:.1f}MB) exceeds limit of {max_size}MB for {self.header_type} files.'
+                    self.is_uploading_media = False
+                    return
+                    
+            except Exception as e:
+                self.upload_status = 'error'
+                self.upload_error_message = f'Error processing file: {str(e)}'
+                self.is_uploading_media = False
+                return
+            
+            # Perform upload
+            try:
+                self._perform_media_upload()
+                # Upload was successful - no need to return notification here
+                # as the UI will show the success status
+            except ValidationError as ve:
+                self.upload_status = 'error'
+                error_msg = str(ve)
+                # Clean up the error message
+                if error_msg.startswith('ValidationError\n\n'):
+                    error_msg = error_msg.replace('ValidationError\n\n', '')
+                self.upload_error_message = error_msg.replace('\n', ' ').strip()
+                self.is_uploading_media = False
+                _logger.error(f'Media upload failed: {ve}')
+            except Exception as e:
+                self.upload_status = 'error'
+                self.upload_error_message = f'Unexpected error: {str(e)}'
+                self.is_uploading_media = False
+                _logger.error(f'Unexpected media upload error: {e}', exc_info=True)
+
+
+
+
+    @api.onchange('name', 'category', 'phone_number', 'body_text', 'body_examples', 
+              'footer_text', 'add_security_recommendation', 'code_expiration_minutes',
+              'button_1_text', 'button_1_type', 'button_1_url', 'button_1_url_example',
+              'button_1_phone_number', 'button_1_phone_example', 'button_1_otp_type',
+              'button_2_text', 'button_2_type', 'button_2_url', 'button_2_url_example',
+              'button_2_phone_number', 'button_2_phone_example', 'button_2_otp_type',
+              'button_3_text', 'button_3_type', 'button_3_url', 'button_3_url_example',
+              'button_3_phone_number', 'button_3_phone_example', 'button_3_otp_type')
+    def _onchange_preserve_header_media(self):
+        """Ensure header media ID is preserved when other fields change"""
+        # This method intentionally does nothing - it just triggers recomputation
+        # while ensuring the media ID isn't cleared by other onchange methods
+        pass
+
+
 
     @api.depends('header_type', 'header_text', 'header_example', 'header_media_id',
-                'body_text', 'body_examples', 'footer_text', 'category',
-                'add_security_recommendation', 'code_expiration_minutes',
-                'button_1_text', 'button_1_type', 'button_1_url', 'button_1_url_example',
-                'button_1_phone_number', 'button_1_phone_example', 'button_1_otp_type',
-                'button_2_text', 'button_2_type', 'button_2_url', 'button_2_url_example',
-                'button_2_phone_number', 'button_2_phone_example', 'button_2_otp_type',
-                'button_3_text', 'button_3_type', 'button_3_url', 'button_3_url_example',
-                'button_3_phone_number', 'button_3_phone_example', 'button_3_otp_type')
+            'body_text', 'body_examples', 'footer_text', 'category',
+            'add_security_recommendation', 'code_expiration_minutes',
+            'button_1_text', 'button_1_type', 'button_1_url', 'button_1_url_example',
+            'button_1_phone_number', 'button_1_phone_example', 'button_1_otp_type',
+            'button_2_text', 'button_2_type', 'button_2_url', 'button_2_url_example',
+            'button_2_phone_number', 'button_2_phone_example', 'button_2_otp_type',
+            'button_3_text', 'button_3_type', 'button_3_url', 'button_3_url_example',
+            'button_3_phone_number', 'button_3_phone_example', 'button_3_otp_type')
     def _compute_component_data(self):
         """Compute component data JSON matching API format"""
         for record in self:
             component = {}
             
-            # Header
-            if record.header_type and (record.header_text or record.header_media_id):
-                header_data = {'format': record.header_type}
-                
+            # Header - Always preserve media ID if it exists
+            if record.header_type:
                 if record.header_type == 'TEXT' and record.header_text:
-                    header_data['text'] = record.header_text
+                    header_data = {
+                        'format': record.header_type,
+                        'text': record.header_text
+                    }
                     if record.header_example:
                         header_data['example'] = record.header_example
-                elif record.header_media_id:
-                    header_data['mediaId'] = record.header_media_id
-                
-                component['header'] = header_data
+                    component['header'] = header_data
+                elif record.header_type in ['IMAGE', 'VIDEO', 'DOCUMENT'] and record.header_media_id:
+                    # For media headers, only include if we have a media ID
+                    component['header'] = {
+                        'format': record.header_type,
+                        'mediaId': record.header_media_id
+                    }
             
             # Body
             if record.category == 'AUTHENTICATION':
@@ -446,18 +470,19 @@ class LipachatTemplate(models.Model):
                 component['body'] = body_data
             else:
                 # Regular body handling
-                body_data = {'text': record.body_text}
-                
-                # Add examples if body contains variables
-                if record.body_examples and re.search(r'\{\{[0-9]+\}\}', record.body_text):
-                    try:
-                        examples = json.loads(record.body_examples)
-                        if isinstance(examples, list):
-                            body_data['examples'] = examples
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-                
-                component['body'] = body_data
+                if record.body_text:
+                    body_data = {'text': record.body_text}
+                    
+                    # Add examples if body contains variables
+                    if record.body_examples and re.search(r'\{\{[0-9]+\}\}', record.body_text):
+                        try:
+                            examples = json.loads(record.body_examples)
+                            if isinstance(examples, list):
+                                body_data['examples'] = examples
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    
+                    component['body'] = body_data
             
             # Footer
             if record.category == 'AUTHENTICATION' and record.code_expiration_minutes:
@@ -506,6 +531,22 @@ class LipachatTemplate(models.Model):
                 component['buttons'] = buttons
             
             record.component_data = json.dumps(component, indent=2)
+
+
+
+    @api.model
+    def write(self, vals):
+        """Override write to preserve media ID"""
+        # If header_media_id is not being explicitly updated and we have an existing one,
+        # make sure it's preserved
+        for record in self:
+            if record.header_media_id and 'header_media_id' not in vals:
+                # Ensure media ID is not accidentally cleared
+                if 'header_type' in vals and vals['header_type'] in ['IMAGE', 'VIDEO', 'DOCUMENT']:
+                    # Keep existing media ID for media types
+                    vals['header_media_id'] = record.header_media_id
+        
+        return super().write(vals)
     
     def _extract_variables_from_text(self, text):
         """Extract variable placeholders from text like {{1}}, {{2}}"""

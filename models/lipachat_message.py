@@ -69,7 +69,10 @@ class LipachatMessage(models.Model):
     
     # Template fields
     template_name = fields.Many2one('lipachat.template', string='Template')
-    template_data = fields.Text(related='template_id.data', store=True, readonly=True)
+    template_media_url = fields.Char('Media URL', readonly="state != 'draft'")
+    template_variables = fields.Text('Template Variables', compute='_compute_template_variables', store=False)
+    template_placeholders = fields.Text('Placeholder Values', default='[]')
+  
     
     # Status fields
     state = fields.Selection([
@@ -87,6 +90,39 @@ class LipachatMessage(models.Model):
     
     # Computed field for truncated message display
     message_text_short = fields.Char('Content Preview', compute='_compute_message_text_short', store=False)
+
+    @api.depends('template_name')
+    def _compute_template_variables(self):
+        for record in self:
+            if record.template_name and record.template_name.body:
+                # Find all variables like {{1}}, {{2}}, etc.
+                variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body)
+                record.template_variables = json.dumps(list(set(variables)))  # Remove duplicates
+            else:
+                record.template_variables = '[]'
+    
+    def _prepare_template_components(self):
+        """Prepare the components dictionary for template messages"""
+        components = {}
+        
+        # Add header if media URL is provided
+        if self.template_media_url:
+            components['header'] = {
+                'type': 'IMAGE',  # Could make this configurable if needed
+                'mediaUrl': self.template_media_url
+            }
+        
+        # Add body with placeholders if variables exist
+        if self.template_variables and self.template_placeholders:
+            try:
+                placeholders = json.loads(self.template_placeholders)
+                components['body'] = {
+                    'placeholders': placeholders
+                }
+            except (json.JSONDecodeError, TypeError):
+                pass
+                
+        return components
 
     @api.depends('message_text')
     def _compute_message_text_short(self):
@@ -318,16 +354,15 @@ class LipachatMessage(models.Model):
         return self._handle_response(response)
     
     def _send_template_message(self, config, headers, recipient):
-        template_data = json.loads(self.template_data) if self.template_data else {}
-        
+       
         data = {
             "messageId": self.message_id,
             "to": recipient['phone'],
             "from": self.from_number or config.default_from_number,
             "template": {
-                "name": self.template_name,
+                "name": self.template_name.name,
                 "languageCode": "en",
-                "components": template_data
+                "components": self._prepare_template_components()
             }
         }
         
@@ -395,4 +430,3 @@ class LipachatMessage(models.Model):
                 record.buttons_data = False
             if record.message_type != 'template':
                 record.template_name = False
-                record.template_data = False

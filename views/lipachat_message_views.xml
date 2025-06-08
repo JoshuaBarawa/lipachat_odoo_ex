@@ -120,13 +120,40 @@
                                 
                                 <!-- Template Message Section -->
                                 <group string="Template Message" invisible="message_type != 'template'">
-
-                                   <!-- <field name="template_id"/> -->
                                     <field name="template_name" placeholder="Select a template..."
                                         readonly="state != 'draft'"/>
-                                     <!-- 
-                                    <field name="template_data" widget="ace" options="{'mode': 'json'}" 
-                                        readonly="state != 'draft'"/> -->
+
+                                    <!-- Media URL field (only shown if template has media) -->
+                                    <field name="template_media_url" 
+                                        invisible="template_name == False"
+                                        readonly="state != 'draft'"/>
+
+                                     <field name="template_variables" invisible="1"/>
+
+
+                                    <field name="template_placeholders" 
+                                        string="Template Variables"
+                                        widget="text" 
+                                        placeholder="Enter values for template variables as JSON (e.g., {'name': 'John', 'company': 'ABC Corp'})"
+                                        invisible="template_variables == '[]'"
+                                        readonly="state != 'draft'"/>
+
+                                    <!-- <div class="o_row" invisible="template_variables == '[]'">
+                                        <span string="Template Variables" class="o_form_label" style="font-weight: bold;"/>
+                                        <div>
+                                            <t t-foreach="json.loads(template_variables or '[]')" t-as="var">
+                                                <div class="o_row">
+                                                    <span t-esc="'{{%s}}'" class="o_form_label"/>
+                                                    <field name="template_placeholders" 
+                                                        widget="template_variable_input" 
+                                                        t-att-data-index="var"
+                                                        t-att-placeholder="'Value for {{%s}}' % var"
+                                                        class="o_template_variable_input"/>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </div> -->
+
                                 </group>
 
                             </page>

@@ -28,6 +28,9 @@
                         
                         <!-- Header Section -->
                         <group string="Header" class="mt16" invisible="category == 'AUTHENTICATION'">
+                        
+                            <field name="header_media_id" invisible="1"/>
+
                             <field name="header_type"/>
                             <field name="header_text" invisible="header_type != 'TEXT'" 
                                    placeholder="Enter header text (use {{1}}, {{2}} for variables)"/>
@@ -86,6 +89,11 @@
                             <field name="footer_text" placeholder="Enter footer text..."
                                    invisible="category == 'AUTHENTICATION'"/>
                             <field name="code_expiration_minutes" invisible="category != 'AUTHENTICATION'"/>
+                        </group>
+
+                          <!-- component data debug -->
+                          <group string="component data debug" class="mt16">
+                            <field name="component_data"/>
                         </group>
 
                         
