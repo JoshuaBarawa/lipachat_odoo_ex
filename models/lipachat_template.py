@@ -473,7 +473,6 @@ class LipachatTemplate(models.Model):
                             'format': record.header_type,
                             'mediaId': record.header_media_id or ''
                         }
-
             
             # Body
             if record.category == 'AUTHENTICATION':
@@ -551,15 +550,16 @@ class LipachatTemplate(models.Model):
     @api.model
     def write(self, vals):
         """Override write to preserve media ID"""
-        # If header_media_id is not being explicitly updated and we have an existing one,
-        # make sure it's preserved
         for record in self:
-            if record.header_media_id and 'header_media_id' not in vals:
-                # Ensure media ID is not accidentally cleared
-                if 'header_type' in vals and vals['header_type'] in ['IMAGE', 'VIDEO', 'DOCUMENT']:
-                    # Keep existing media ID for media types
+            # If we're changing to a media header type and have an existing media ID
+            if 'header_type' in vals and vals['header_type'] in ['IMAGE', 'VIDEO', 'DOCUMENT']:
+                if record.header_media_id and 'header_media_id' not in vals:
                     vals['header_media_id'] = record.header_media_id
-        
+            
+            # If we're clearing the media, clear the ID too
+            if 'header_media' in vals and not vals['header_media']:
+                vals['header_media_id'] = False
+                
         return super().write(vals)
     
     def _extract_variables_from_text(self, text):
