@@ -77,7 +77,10 @@
                                     invisible="category == 'AUTHENTICATION'" class="body-message-field"/><br/>
                          </group>
                           <group class="mt16">   
-                                <field name="body_examples" placeholder='i.e ["Example 1", "Example 2"]' invisible="category == 'AUTHENTICATION'"/>
+                            <!-- Remove or hide the body_examples field group -->
+                            <field name="body_examples" invisible="1"/>
+                            
+                            <!-- <field name="body_examples" placeholder='i.e ["Example 1", "Example 2"]' invisible="category == 'AUTHENTICATION'"/> -->
                          </group>
                           <group>   
                                 <field name="add_security_recommendation" invisible="category != 'AUTHENTICATION'"/>

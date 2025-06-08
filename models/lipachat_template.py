@@ -487,13 +487,19 @@ class LipachatTemplate(models.Model):
                     body_data = {'text': record.body_text}
                     
                     # Add examples if body contains variables
-                    if record.body_examples and re.search(r'\{\{[0-9]+\}\}', record.body_text):
-                        try:
-                            examples = json.loads(record.body_examples)
-                            if isinstance(examples, list):
-                                body_data['examples'] = examples
-                        except (json.JSONDecodeError, TypeError):
-                            pass
+                    variables = record._extract_variables_from_text(record.body_text)
+                    if variables:
+                        if record.body_examples:
+                            try:
+                                examples = json.loads(record.body_examples)
+                                if isinstance(examples, list):
+                                    body_data['examples'] = examples
+                            except (json.JSONDecodeError, TypeError):
+                                # Fallback to auto-generated examples if parsing fails
+                                body_data['examples'] = [f"example{i}" for i in range(1, len(variables)+1)]
+                        else:
+                            # Auto-generate examples if none exist
+                            body_data['examples'] = [f"example{i}" for i in range(1, len(variables)+1)]
                     
                     component['body'] = body_data
             
@@ -562,30 +568,48 @@ class LipachatTemplate(models.Model):
                 
         return super().write(vals)
     
+
+
+    
     def _extract_variables_from_text(self, text):
         """Extract variable placeholders from text like {{1}}, {{2}}"""
         if not text:
             return []
-        return re.findall(r'\{\{([0-9]+)\}\}', text)
+        
+        # Find all variables and return unique sorted variable numbers
+        variables = sorted(set(re.findall(r'\{\{([0-9]+)\}\}', text)))
+        
+        # Convert to integers and sort numerically
+        try:
+            variables = sorted([int(v) for v in variables])
+        except (ValueError, TypeError):
+            return []
+        
+        return variables
     
-    @api.constrains('body_examples', 'body_text')
+
+    
+    @api.constrains('body_text', 'body_examples')
     def _check_body_examples(self):
         """Validate that examples match the variables in body text"""
         for record in self:
-            if record.body_examples and record.body_text:
-                variables = record._extract_variables_from_text(record.body_text)
-                if variables:
+            if not record.body_text or record.category == 'AUTHENTICATION':
+                continue
+                
+            variables = record._extract_variables_from_text(record.body_text)
+            
+            if variables:
+                # If we have examples, validate them
+                if record.body_examples:
                     try:
                         examples = json.loads(record.body_examples)
                         if not isinstance(examples, list):
                             raise ValidationError(_('Body examples must be a JSON array'))
                         
-                        max_var = max([int(v) for v in variables])
-                        if len(examples) < max_var:
+                        if len(examples) < len(variables):
                             raise ValidationError(
                                 _('Body examples must have at least %d items for variables %s') % 
-                                (max_var, ', '.join([f'{{{{{v}}}}}' for v in variables]))
-                            )
+                                (len(variables), ', '.join([f'{{{{{v}}}}}' for v in variables])))
                     except (json.JSONDecodeError, ValueError):
                         raise ValidationError(_('Body examples must be valid JSON array'))
                     
@@ -641,6 +665,24 @@ class LipachatTemplate(models.Model):
                 not record.header_media_id and 
                 record.upload_status != 'success'):
                 raise ValidationError(_('Media ID is required for %s header type. Please upload media first.') % record.header_type)
+ 
+
+
+    @api.onchange('body_text')
+    def _onchange_body_text(self):
+        """Auto-populate body examples when variables are detected"""
+        if not self.body_text or self.category == 'AUTHENTICATION':
+            return
+        
+        # Extract all variables like {{1}}, {{2}} from the text
+        variables = self._extract_variables_from_text(self.body_text)
+        
+        if variables:
+            # Create example values for each variable found
+            examples = [f"example{i}" for i in range(1, len(variables)+1)]
+            self.body_examples = json.dumps(examples)
+        else:
+            self.body_examples = False
 
     
     def create_template(self):
