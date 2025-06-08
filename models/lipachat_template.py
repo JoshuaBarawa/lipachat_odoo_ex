@@ -458,12 +458,22 @@ class LipachatTemplate(models.Model):
                     if record.header_example:
                         header_data['example'] = record.header_example
                     component['header'] = header_data
-                elif record.header_type in ['IMAGE', 'VIDEO', 'DOCUMENT'] and record.header_media_id:
+                elif record.header_type in ['IMAGE', 'VIDEO', 'DOCUMENT']:
                     # For media headers, only include if we have a media ID
-                    component['header'] = {
-                        'format': record.header_type,
-                        'mediaId': record.header_media_id
-                    }
+                    if record.header_media_id:
+                        component['header'] = {
+                            'format': record.header_type,
+                            'mediaId': record.header_media_id
+                        }
+                    else:
+                        # Still include the header structure but note missing media
+                        _logger.warning(f"Header type {record.header_type} specified but no media_id available for template {record.name}")
+                        # You might want to include it anyway for debugging
+                        component['header'] = {
+                            'format': record.header_type,
+                            'mediaId': record.header_media_id or ''
+                        }
+
             
             # Body
             if record.category == 'AUTHENTICATION':
@@ -636,7 +646,7 @@ class LipachatTemplate(models.Model):
     def create_template(self):
         """Create template via API"""
         self._compute_component_data()
-
+        
         config = self.env['lipachat.config'].get_active_config()
         
         headers = {
@@ -644,44 +654,44 @@ class LipachatTemplate(models.Model):
             'Content-Type': 'application/json'
         }
         
-        # Use different data structure for AUTHENTICATION category
+        # Use the computed component data directly
+        component_data = json.loads(self.component_data) if self.component_data else {}
+
+         # Debug logging
+        _logger.info(f"=== Template Creation Debug ===")
+        _logger.info(f"Template name: {self.name}")
+        _logger.info(f"Header type: {self.header_type}")
+        _logger.info(f"Header media ID: {self.header_media_id}")
+        _logger.info(f"Component data: {json.dumps(component_data, indent=2)}")
+        
+        # For AUTHENTICATION category, ensure proper structure
         if self.category == 'AUTHENTICATION':
-            component_data = {
-                "body": {},
-                "buttons": []
-            }
+            # Keep the existing authentication logic but use component structure
+            if not component_data.get('body'):
+                component_data['body'] = {}
             
-            # Add optional body settings
             if self.add_security_recommendation:
-                component_data["body"]["addSecurityRecommendation"] = True
+                component_data['body']['addSecurityRecommendation'] = True
                 
-            # Add optional footer settings
             if self.code_expiration_minutes:
-                component_data["footer"] = {
-                    "codeExpirationMinutes": self.code_expiration_minutes
+                component_data['footer'] = {
+                    'codeExpirationMinutes': self.code_expiration_minutes
                 }
-             
-            button_data = {
-                "type": "OTP",
-                "text": "Copy Code",
-                "otpType": "COPY_CODE",
-            }
-            component_data["buttons"].append(button_data)
             
-            data = {
-                'name': self.name,
-                'language': self.language,
-                'category': self.category,
-                'component': component_data
-            }
-        else:
-            # Use existing structure for other categories
-            data = {
-                'name': self.name,
-                'language': self.language,
-                'category': self.category,
-                'component': json.loads(self.component_data)
-            }
+            # Add OTP button if not already present
+            if not component_data.get('buttons'):
+                component_data['buttons'] = [{
+                    'type': 'OTP',
+                    'text': 'Copy Code',
+                    'otpType': 'COPY_CODE',
+                }]
+        
+        data = {
+            'name': self.name,
+            'language': self.language,
+            'category': self.category,
+            'component': component_data
+        }
         
         try:
             response = requests.post(
