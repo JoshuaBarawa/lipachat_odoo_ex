@@ -94,12 +94,13 @@ class LipachatMessage(models.Model):
     @api.depends('template_name')
     def _compute_template_variables(self):
         for record in self:
-            if record.template_name and record.template_name.body:
+            if record.template_name and record.template_name.body_text:
                 # Find all variables like {{1}}, {{2}}, etc.
-                variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body)
+                variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body_text)
                 record.template_variables = json.dumps(list(set(variables)))  # Remove duplicates
             else:
                 record.template_variables = '[]'
+
     
     def _prepare_template_components(self):
         """Prepare the components dictionary for template messages"""
