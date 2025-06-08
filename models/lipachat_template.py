@@ -352,6 +352,10 @@ class LipachatTemplate(models.Model):
     @api.onchange('header_media', 'header_media_filename')
     def _onchange_header_media(self):
         """Auto-upload media when file is selected - improved version"""
+        # Skip constraint validation during this process
+        self = self.with_context(skip_constraint_validation=True)
+
+
         # Only process if we actually have new media and no existing media_id
         if self.header_media and self.header_media_filename and not self.header_media_id:
             # Reset previous status
@@ -613,14 +617,26 @@ class LipachatTemplate(models.Model):
     @api.constrains('header_type', 'header_media_id')
     def _check_media_requirements(self):
         """Validate media requirements for non-text headers"""
+        # Skip validation if context flag is set
+        if self.env.context.get('skip_constraint_validation'):
+            return
+            
         for record in self:
-            if record.header_type and record.header_type != 'TEXT' and not record.header_media_id:
+            # Skip validation during upload process
+            if record.is_uploading_media or record.upload_status == 'uploading':
+                continue
+                
+            if (record.header_type and 
+                record.header_type != 'TEXT' and 
+                not record.header_media_id and 
+                record.upload_status != 'success'):
                 raise ValidationError(_('Media ID is required for %s header type. Please upload media first.') % record.header_type)
-    
 
     
     def create_template(self):
         """Create template via API"""
+        self._compute_component_data()
+
         config = self.env['lipachat.config'].get_active_config()
         
         headers = {
