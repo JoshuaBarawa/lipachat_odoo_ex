@@ -122,12 +122,15 @@ class LipachatTemplate(models.Model):
     
     component_data = fields.Text('Component Data (JSON)', compute='_compute_component_data', store=True)
 
-
+    @api.model
     def action_fetch_templates(self):
         # You can hardcode or fetch the phone number dynamically
         config = self.env['lipachat.config'].get_active_config()
+        if not config:
+            raise ValidationError(_("No active configuration found"))
+            
+        phone_number = config.default_from_number or '254110090747'
 
-        phone_number = self.env['lipachat.config'].get_active_config().default_from_number or '254110090747'
         url = f"{config.api_base_url}/template/{phone_number}"
         headers = {
             'apiKey': config.api_key,
