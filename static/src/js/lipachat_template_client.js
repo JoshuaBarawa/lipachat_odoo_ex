@@ -126,14 +126,29 @@
         }
     }
 
-    // Auto-fetch on first load
+    // Track fetched pages to avoid duplicate fetches during the same visit
+    let fetchedPages = new Set();
+    let isCurrentlyFetching = false;
+
+    // Auto-fetch on page load - fetch once per visit without reload
     async function autoFetchOnLoad() {
-        // Check if we already auto-fetched in this session
-        const sessionKey = 'lipachat_autofetch_' + window.location.pathname;
-        if (sessionStorage.getItem(sessionKey)) {
-            console.log('Auto-fetch already done for this session');
+        const currentUrl = window.location.href;
+        
+        // Check if we're already fetching
+        if (isCurrentlyFetching) {
+            console.log('Auto-fetch already in progress, skipping...');
             return;
         }
+        
+        // Check if we've already fetched this URL in this visit
+        if (fetchedPages.has(currentUrl)) {
+            console.log('Auto-fetch already completed for this URL in current visit');
+            return;
+        }
+        
+        // Mark as being fetched
+        fetchedPages.add(currentUrl);
+        isCurrentlyFetching = true;
         
         console.log('Starting auto-fetch of templates...');
         showLoadingState();
@@ -142,17 +157,18 @@
             const result = await makeRpcCall('lipachat.template', 'action_fetch_templates', [], {});
             console.log('Auto-fetch successful:', result);
             
-            // Mark as done for this session
-            sessionStorage.setItem(sessionKey, 'done');
+            // Remove loading state - no reload needed
+            removeLoadingState();
             
-            // Reload to show fresh data
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
+            // Try to refresh the list view data without full page reload
+            await refreshListView();
             
         } catch (e) {
             console.error('Auto-fetch failed:', e);
             removeLoadingState();
+            
+            // Remove from fetched pages on error so it can be retried
+            fetchedPages.delete(currentUrl);
             
             // Show error notification
             const notification = document.createElement('div');
@@ -166,6 +182,72 @@
             const target = document.querySelector('.o_control_panel') || document.querySelector('.o_list_view');
             if (target) {
                 target.insertAdjacentElement('afterend', notification);
+            }
+        } finally {
+            isCurrentlyFetching = false;
+        }
+    }
+
+    // Try to refresh the list view without full page reload
+    async function refreshListView() {
+        try {
+            // Method 1: Try to trigger Odoo's list view refresh
+            if (window.odoo && window.odoo.__DEBUG__ && window.odoo.__DEBUG__.services) {
+                const actionService = window.odoo.__DEBUG__.services['action'];
+                if (actionService && actionService.doAction) {
+                    await actionService.doAction('reload');
+                    console.log('List view refreshed via action service');
+                    return;
+                }
+            }
+            
+            // Method 2: Try to find and click a refresh button
+            const refreshBtn = document.querySelector('.o_cp_action_menus .o_dropdown_toggler_btn') || 
+                              document.querySelector('.o_control_panel .fa-refresh') ||
+                              document.querySelector('[data-hotkey="r"]');
+            if (refreshBtn) {
+                refreshBtn.click();
+                console.log('List view refreshed via refresh button');
+                return;
+            }
+            
+            // Method 3: Fallback - show success message instead of reload
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success alert-dismissible';
+            successDiv.style.margin = '10px';
+            successDiv.innerHTML = `
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                <strong>Success:</strong> Templates fetched successfully. Refresh the page to see the latest data.
+            `;
+            
+            const target = document.querySelector('.o_control_panel') || document.querySelector('.o_list_view');
+            if (target) {
+                target.insertAdjacentElement('afterend', successDiv);
+                
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    if (successDiv.parentNode) {
+                        successDiv.remove();
+                    }
+                }, 5000);
+            }
+            
+            console.log('Fallback: showed success message');
+            
+        } catch (e) {
+            console.error('Could not refresh list view:', e);
+            // Show success message as fallback
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success alert-dismissible';
+            successDiv.style.margin = '10px';
+            successDiv.innerHTML = `
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                <strong>Success:</strong> Templates fetched successfully. Refresh the page to see the latest data.
+            `;
+            
+            const target = document.querySelector('.o_control_panel') || document.querySelector('.o_list_view');
+            if (target) {
+                target.insertAdjacentElement('afterend', successDiv);
             }
         }
     }
@@ -185,7 +267,13 @@
 
     // Handle both initial load and navigation
     function handlePageLoad() {
-        initializePage();
+        // Clear any existing loading states when navigating
+        removeLoadingState();
+        
+        // Initialize the page
+        setTimeout(() => {
+            initializePage();
+        }, 100);
     }
 
     // Event listeners
@@ -195,25 +283,77 @@
         handlePageLoad();
     }
 
-    // Also listen for URL changes (for SPA navigation)
+    // Enhanced URL change detection for Odoo SPA navigation
     let currentUrl = window.location.href;
-    const observer = new MutationObserver(() => {
+    
+    // Method 1: MutationObserver for DOM changes
+    const domObserver = new MutationObserver(() => {
         if (window.location.href !== currentUrl) {
+            const oldUrl = currentUrl;
             currentUrl = window.location.href;
-            setTimeout(handlePageLoad, 500); // Delay to ensure DOM is updated
+            console.log('URL changed from', oldUrl, 'to', currentUrl);
+            setTimeout(handlePageLoad, 300);
         }
     });
 
     if (document.body) {
-        observer.observe(document.body, {
+        domObserver.observe(document.body, {
             childList: true,
             subtree: true
         });
     }
 
+    // Method 2: Listen for popstate events (browser back/forward)
+    window.addEventListener('popstate', () => {
+        console.log('Popstate event detected');
+        setTimeout(handlePageLoad, 300);
+    });
+
+    // Method 3: Override pushState and replaceState to catch programmatic navigation
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    history.pushState = function(...args) {
+        originalPushState.apply(history, args);
+        console.log('PushState detected');
+        setTimeout(handlePageLoad, 300);
+    };
+
+    history.replaceState = function(...args) {
+        originalReplaceState.apply(history, args);
+        console.log('ReplaceState detected');
+        setTimeout(handlePageLoad, 300);
+    };
+
+    // Method 4: Periodic URL checking as fallback
+    setInterval(() => {
+        if (window.location.href !== currentUrl) {
+            const oldUrl = currentUrl;
+            currentUrl = window.location.href;
+            console.log('Periodic check: URL changed from', oldUrl, 'to', currentUrl);
+            handlePageLoad();
+        }
+    }, 1000);
+
+    // Clear fetched pages when navigating away from templates
+    function clearFetchedPagesIfNeeded() {
+        if (!isLipachatTemplateListView()) {
+            if (fetchedPages.size > 0) {
+                console.log('Clearing fetched pages cache as we left template view');
+                fetchedPages.clear();
+                isCurrentlyFetching = false;
+            }
+        }
+    }
+
+    // Check periodically if we need to clear the cache
+    setInterval(clearFetchedPagesIfNeeded, 2000);
+
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
-        observer.disconnect();
+        domObserver.disconnect();
+        fetchedPages.clear();
+        isCurrentlyFetching = false;
     });
 
 })();
