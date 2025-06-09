@@ -390,12 +390,44 @@
             return this.initPromise;
         }
 
+
+
+        async loadTemplates() {
+            try {
+                const templates = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'get_available_templates',
+                    []
+                );
+                
+                // You can use this data to enhance the UI if needed
+                return templates;
+            } catch (error) {
+                console.error("Error loading templates:", error);
+                return [];
+            }
+        }
+
+        setupTemplateSelection() {
+            const templateField = document.querySelector('input[name="template_id"]') || 
+                                 document.querySelector('.o_field_many2one[name="template_id"]');
+            
+            if (templateField) {
+                this.addEventListener(templateField, 'change', (event) => {
+                    // The onchange will be handled by Odoo's standard many2one widget
+                    // But we can add additional handling here if needed
+                });
+            }
+        }
+        
+
         async _doInitialize() {
             console.log("WhatsApp Chat Client initializing...");
         
             // Start all async operations in parallel immediately
             const preloadPromise = this.preloadRecentContact();
             const contactsPromise = this.updateContactsList();
+            const templatesPromise = this.loadTemplates();
             
             // Setup event delegation (works even before contacts are loaded)
             this.addEventListener(document, 'click', (event) => {
@@ -429,9 +461,11 @@
         
             // Setup message input with minimal waiting
             this.setupMessageInput();
-        
+            this.setupTemplateSelection();
+
             // Wait for preload to complete
             await Promise.all([preloadPromise, contactsPromise]);
+            await Promise.all([preloadPromise, contactsPromise, templatesPromise]);
         
             this.startAutoRefresh();
             this.isInitialized = true;

@@ -29,6 +29,18 @@
                                     <field name="messages_html" widget="html" nolabel="1" class="o_whatsapp_messages_html"/>
                                 </div>
                                 <div class="chat-input-container">
+
+                                    <field name="template_id" widget="many2one" 
+                                        options="{'no_open': True, 'no_create': True}" 
+                                        placeholder="Select a template..."
+                                        domain="[('status', '=', 'submitted')]"/>
+                                    
+                                    <div class="template-preview" style="padding: 8px; margin: 5px 0; background: #f8f9fa; border-radius: 4px;"
+                                         invisible="[('template_preview', '=', False)]">
+                                        <field name="template_preview" widget="html" nolabel="1"/>
+                                    </div>
+
+
                                     <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/>  
                                      <div class="btn btn-primary o_whatsapp_send_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
                                         <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send

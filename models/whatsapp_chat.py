@@ -19,6 +19,45 @@ class WhatsappChat(models.TransientModel):
     new_message = fields.Text(string="New Message")
     last_refresh = fields.Datetime(string="Last Refresh", default=fields.Datetime.now) # Keep for potential manual refresh or other computes
 
+
+    template_id = fields.Many2one('lipachat.template', string="Template")
+    template_preview = fields.Html(string="Template Preview", compute="_compute_template_preview")
+
+    @api.depends('template_id')
+    def _compute_template_preview(self):
+        for record in self:
+            if not record.template_id:
+                record.template_preview = False
+                continue
+                
+            # Create a simple preview of the template
+            preview_lines = []
+            if record.template_id.header_text:
+                preview_lines.append(f"<strong>Header:</strong> {record.template_id.header_text}")
+            if record.template_id.body_text:
+                preview_lines.append(f"<strong>Body:</strong> {record.template_id.body_text}")
+            if record.template_id.footer_text:
+                preview_lines.append(f"<strong>Footer:</strong> {record.template_id.footer_text}")
+                
+            record.template_preview = "<br>".join(preview_lines) if preview_lines else "No preview available"
+    
+    @api.onchange('template_id')
+    def _onchange_template_id(self):
+        """Insert template content into message field when selected"""
+        if self.template_id and self.template_id.body_text:
+            self.new_message = self.template_id.body_text
+    
+    def get_available_templates(self):
+        """Return available templates for RPC"""
+        templates = self.env['lipachat.template'].search([('status', '=', 'submitted')])
+        return [{
+            'id': t.id,
+            'name': t.name,
+            'body_text': t.body_text,
+            'header_text': t.header_text,
+            'footer_text': t.footer_text
+        } for t in templates]
+
     @api.model
     def create(self, vals):
         """
