@@ -49,7 +49,7 @@ class WhatsappChat(models.TransientModel):
     
     def get_available_templates(self):
         """Return available templates for RPC"""
-        templates = self.env['lipachat.template'].search([('status', '=', 'submitted')])
+        templates = self.env['lipachat.template'].search([('status', '=', 'approved')])
         return [{
             'id': t.id,
             'name': t.name,
