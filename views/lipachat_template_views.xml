@@ -12,6 +12,10 @@
                         <button name="create_template" string="Create Template" type="object" 
                                 class="btn-primary"/>
                         <field name="status" widget="statusbar" statusbar_visible="draft,submitted,approved,rejected"/>
+                              <button name="action_fetch_templates"
+                            type="object"
+                            string="Fetch Templates"
+                            class="oe_highlight"/>
                     </header>
                     <sheet>
                         <!-- First row with Template Name, Category, and Language -->
@@ -147,7 +151,7 @@
             <field name="name">lipachat.template.tree</field>
             <field name="model">lipachat.template</field>
             <field name="arch" type="xml">
-                <tree string="WhatsApp Templates" decoration-success="status=='approved'" decoration-warning="status=='submitted'">
+                <tree string="WhatsApp Templates" decoration-success="status=='approved'" decoration-warning="status=='pending'" decoration-danger="status=='rejected'">
                     <field name="name"/>
                     <field name="category"/>
                     <field name="language"/>

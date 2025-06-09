@@ -33,7 +33,8 @@ class LipachatTemplate(models.Model):
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
         ('approved', 'Approved'),
-        ('rejected', 'Rejected')
+        ('rejected', 'Rejected'),
+        ('pending', 'Pending')
     ], 'Status', default='draft', readonly=True)
     
     # Header components
@@ -120,6 +121,70 @@ class LipachatTemplate(models.Model):
     ], 'OTP Type', default='COPY_CODE')
     
     component_data = fields.Text('Component Data (JSON)', compute='_compute_component_data', store=True)
+
+
+    def action_fetch_templates(self):
+        # You can hardcode or fetch the phone number dynamically
+        config = self.env['lipachat.config'].get_active_config()
+
+        phone_number = self.env['lipachat.config'].get_active_config().default_from_number or '254110090747'
+        url = f"{config.api_base_url}/template/{phone_number}"
+        headers = {
+            'apiKey': config.api_key,
+            'Content-Type': 'application/json'
+        }
+
+        try:
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            raise ValidationError(_("Failed to fetch templates: %s") % str(e))
+
+        templates = data.get("data", {}).get("data", [])
+        for tpl in templates:
+            vals = {
+                "name": tpl.get("name"),
+                "language": tpl.get("language"),
+                "category": tpl.get("category"),
+                "status": tpl.get("status").lower() if tpl.get("status") else "draft",
+                "body_text": "",
+                "header_type": None,
+                "header_text": None,
+                "header_example": None,
+                "header_media_id": None,
+                "phone_number": config.default_from_number
+                # ... map other fields as needed ...
+            }
+            # Parse components
+            for comp in tpl.get("components", []):
+                if comp["type"] == "HEADER":
+                    vals["header_type"] = comp.get("format")
+                    vals["header_text"] = comp.get("text") or None
+                    # Add image/video/document handling if needed
+                    if comp.get("format") == "IMAGE":
+                        vals["header_example"] = comp.get("example", {}).get("header_handle", [None])[0]
+                        vals["header_media_id"] = comp.get("example", {}).get("header_handle", [None])[0]
+                    else:
+                        vals["header_example"] = comp.get("example", {}).get("header_text", [None])[0]
+                elif comp["type"] == "BODY":
+                    vals["body_text"] = comp.get("text")
+                # Handle BUTTONS, FOOTER, etc.
+
+            # Upsert (update or create) template by unique name
+            existing = self.env['lipachat.template'].search([('name', '=', vals["name"])], limit=1)
+            if existing:
+                existing.write(vals)
+            else:
+                self.env['lipachat.template'].create(vals)
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
+
+
+
 
     @api.constrains('category', 'body_text')
     def _check_body_text_requirements(self):
@@ -666,7 +731,7 @@ class LipachatTemplate(models.Model):
                 record.upload_status != 'success'):
                 raise ValidationError(_('Media ID is required for %s header type. Please upload media first.') % record.header_type)
  
-
+    
 
     @api.onchange('body_text')
     def _onchange_body_text(self):
