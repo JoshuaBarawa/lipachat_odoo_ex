@@ -408,14 +408,85 @@
             }
         }
 
+        async handleSendTemplate() {
+            if (this.isSending) return;
+            this.isSending = true;
+        
+            try {
+                const templateField = document.querySelector('input[name="template_id"]') || 
+                                    document.querySelector('.o_field_many2one[name="template_id"]');
+                const templateId = templateField && templateField.value ? parseInt(templateField.value) : null;
+                
+                if (!this.currentSelectedPartnerId) {
+                    this.showChatError('Please select a contact first');
+                    return;
+                }
+        
+                if (!templateId) {
+                    this.showChatError('Please select a template');
+                    return;
+                }
+        
+                // Check if we need a media URL
+                const mediaUrlField = document.querySelector('input[name="template_media_url"]');
+                let mediaUrl = null;
+                
+                if (mediaUrlField && mediaUrlField.style.display !== 'none') {
+                    mediaUrl = mediaUrlField.value.trim();
+                    if (!mediaUrl) {
+                        this.showChatError('Please enter a media URL for this template');
+                        return;
+                    }
+                }
+        
+                this.showSendingStatus(true);
+        
+                const result = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'send_template_message',
+                    [parseInt(this.currentSelectedPartnerId), templateId, mediaUrl]
+                );
+        
+                if (result && result.status === 'success') {
+                    this.showChatSuccess(result.message);
+                    await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+                }
+        
+            } catch (error) {
+                console.error("Error sending template message:", error);
+                this.showChatError(error.message || 'Failed to send template message');
+            } finally {
+                this.showSendingStatus(false);
+                this.isSending = false;
+            }
+        }
+
         setupTemplateSelection() {
             const templateField = document.querySelector('input[name="template_id"]') || 
                                  document.querySelector('.o_field_many2one[name="template_id"]');
             
             if (templateField) {
-                this.addEventListener(templateField, 'change', (event) => {
-                    // The onchange will be handled by Odoo's standard many2one widget
-                    // But we can add additional handling here if needed
+                this.addEventListener(templateField, 'change', async (event) => {
+                    // Get the selected template details
+                    const templateId = templateField.value ? parseInt(templateField.value) : null;
+                    if (templateId) {
+                        const templates = await this.loadTemplates();
+                        const selectedTemplate = templates.find(t => t.id === templateId);
+                        
+                        if (selectedTemplate) {
+                            // Show/hide media URL field based on header type
+                            const mediaUrlField = document.querySelector('input[name="template_media_url"]');
+                            const mediaUrlContainer = document.querySelector('.template-media-url-container');
+                            
+                            if (selectedTemplate.header_type === 'media') {
+                                if (mediaUrlContainer) mediaUrlContainer.style.display = 'block';
+                                if (mediaUrlField) mediaUrlField.required = true;
+                            } else {
+                                if (mediaUrlContainer) mediaUrlContainer.style.display = 'none';
+                                if (mediaUrlField) mediaUrlField.required = false;
+                            }
+                        }
+                    }
                 });
             }
         }

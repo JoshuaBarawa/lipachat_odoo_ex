@@ -34,6 +34,14 @@
                                         options="{'no_open': True, 'no_create': True}" 
                                         placeholder="Select a template..."
                                         domain="[('status', '=', 'approved')]"/>
+
+                                     <field name="show_media_url_field" invisible="1"/>
+
+                                    <div class="template-media-url-container" invisible="not show_media_url_field">
+                                        <field name="template_media_url" placeholder="Enter media URL (https://...)" nolabel="1"/>
+                                    </div>
+
+
                                     
                                     <div class="template-preview" style="padding: 8px; margin: 5px 0; background: #f8f9fa; border-radius: 4px;"
                                          invisible="[('template_preview', '=', False)]">

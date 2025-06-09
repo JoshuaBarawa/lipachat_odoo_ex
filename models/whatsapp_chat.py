@@ -23,6 +23,15 @@ class WhatsappChat(models.TransientModel):
     template_id = fields.Many2one('lipachat.template', string="Template")
     template_preview = fields.Html(string="Template Preview", compute="_compute_template_preview")
 
+
+    template_media_url = fields.Char(string="Media URL", help="URL for media in template header")
+    show_media_url_field = fields.Boolean(compute="_compute_show_media_url_field")
+
+    @api.depends('template_id')
+    def _compute_show_media_url_field(self):
+        for record in self:
+            record.show_media_url_field = record.template_id and record.template_id.header_type == 'IMAGE'
+
     @api.depends('template_id')
     def _compute_template_preview(self):
         for record in self:
@@ -30,22 +39,98 @@ class WhatsappChat(models.TransientModel):
                 record.template_preview = False
                 continue
                 
-            # Create a simple preview of the template
             preview_lines = []
-            if record.template_id.header_text:
-                preview_lines.append(f"<strong>Header:</strong> {record.template_id.header_text}")
+            if record.template_id.header_type == 'text' and record.template_id.header_text:
+                preview_lines.append(f"<strong>Header (Text):</strong> {record.template_id.header_text}")
+            elif record.template_id.header_type == 'media':
+                media_type = record.template_id.header_media_type or 'media'
+                preview_lines.append(f"<strong>Header ({media_type.title()}):</strong> Requires URL")
+                
             if record.template_id.body_text:
                 preview_lines.append(f"<strong>Body:</strong> {record.template_id.body_text}")
             if record.template_id.footer_text:
                 preview_lines.append(f"<strong>Footer:</strong> {record.template_id.footer_text}")
                 
             record.template_preview = "<br>".join(preview_lines) if preview_lines else "No preview available"
+
+
     
     @api.onchange('template_id')
     def _onchange_template_id(self):
         """Insert template content into message field when selected"""
-        if self.template_id and self.template_id.body_text:
-            self.new_message = self.template_id.body_text
+        if self.template_id:
+            self.template_media_url = False
+            if self.template_id.body_text:
+                self.new_message = self.template_id.body_text
+
+
+
+    def send_template_message(self, partner_id, template_id, media_url=None):
+        """
+        Dedicated method for sending template messages
+        """
+        if not partner_id:
+            raise UserError("Please select a contact first")
+
+        partner = self.env['res.partner'].browse(partner_id)
+        if not partner.exists():
+            raise UserError("Selected contact not found")
+
+        template = self.env['lipachat.template'].browse(template_id)
+        if not template.exists():
+            raise UserError("Selected template not found")
+
+        config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
+        if not config:
+            raise UserError("No active LipaChat configuration found")
+
+        try:
+            # Prepare template components
+            components = {
+                'body': {
+                    'placeholders': []
+                }
+            }
+
+            # Handle header based on template type
+            if template.header_type == 'text' and template.header_text:
+                components['header'] = {
+                    'type': 'TEXT',
+                    'parameter': template.header_text
+                }
+            elif template.header_type == 'media' and media_url:
+                components['header'] = {
+                    'type': template.header_media_type.upper(),  # IMAGE, VIDEO, DOCUMENT
+                    'mediaUrl': media_url
+                }
+
+            message = self.env['lipachat.message'].create({
+                'partner_id': partner.id,
+                'phone_number': partner.mobile or partner.phone,
+                'config_id': config.id,
+                'message_type': 'template',
+                'template_name': template.name,
+                'state': 'draft'
+            })
+
+            # Send the message
+            message.send_template_message({
+                'name': template.name,
+                'languageCode': template.language_code or 'en',
+                'components': components
+            })
+
+            return {
+                'status': 'success',
+                'message': f'Template message sent to {partner.name}'
+            }
+        except Exception as e:
+            _logger.error(f"Failed to send template message: {str(e)}")
+            raise UserError(f"Failed to send template message: {str(e)}")
+        
+
+
+
     
     def get_available_templates(self):
         """Return available templates for RPC"""
