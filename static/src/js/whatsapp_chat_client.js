@@ -14,6 +14,10 @@
             this.isSending = false;
             this.eventListeners = [];
             this.initPromise = null; // Track initialization promise
+            this.sessionTimer = null;
+            this.sessionInfo = {};
+            this.sessionTimerInterval = null;
+            this.sessionEndCallback = null;
         }
 
         addEventListener(element, event, handler) {
@@ -118,22 +122,34 @@
                     console.error('Invalid partner ID:', partnerId);
                     return;
                 }
-        
+            
                 this.currentSelectedPartnerId = partnerId;
                 this.currentSelectedContactName = contactName || `Contact ${partnerId}`;
                 this.lastMessageId = 0;
-        
+            
                 this.updateContactSelectionUI(partnerId);
                 this.updateChatHeader(this.currentSelectedContactName);
                 this.updateOdooFields(partnerId, this.currentSelectedContactName);
-        
+                
+                // Check session status first
+                const sessionInfo = await this.checkSessionStatus(partnerId);
+                
+                // Then load messages
                 const messagesHtml = await this.makeRpcCall(
                     'whatsapp.chat',
                     'rpc_get_messages_html',
                     [partnerId]
                 );
                 this.renderMessages(messagesHtml);
-        
+                
+                // If session is active, set up expiration callback
+                if (sessionInfo.active) {
+                    this.sessionEndCallback = () => {
+                        this.showChatInfo('Session has expired');
+                        this.checkSessionStatus(partnerId); // Refresh session status
+                    };
+                }
+                
             } catch (error) {
                 console.error("Error in selectContact:", error);
                 this.renderMessages(`
@@ -206,7 +222,13 @@
 
                 if (result && result.status === 'success') {
                     this.showChatSuccess(result.message);
-                }
+                     // Check if session was started
+                        if (result.session_started) {
+                            setTimeout(() => {
+                                this.checkSessionStatus(this.currentSelectedPartnerId);
+                            }, 1000); // Small delay to ensure session is saved
+                        }
+              }
 
             } catch (error) {
                 console.error("Error sending message:", error);
@@ -379,6 +401,114 @@
                 console.error("Error preloading recent contact:", error);
             }
         }
+
+
+
+        async checkSessionStatus(partnerId) {
+            try {
+                const sessionInfo = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'rpc_get_session_info',
+                    [partnerId]
+                );
+                
+                this.sessionInfo = sessionInfo;
+                this.updateSessionUI(sessionInfo);
+                
+                return sessionInfo;
+            } catch (error) {
+                console.error("Error checking session status:", error);
+                return { active: false };
+            }
+        }
+
+        updateSessionUI(sessionInfo) {
+            const sessionContainer = document.getElementById('session-timer-container');
+            const onlineIndicator = document.querySelector('.online-indicator');
+            
+            if (!sessionContainer || !onlineIndicator) return;
+            
+            if (sessionInfo.active) {
+                sessionContainer.style.display = 'inline-block';
+                onlineIndicator.style.backgroundColor = '#25D366';
+                if (sessionInfo.remaining_time > 0) {
+                    this.startSessionTimer(sessionInfo.remaining_time);
+                } else {
+                    this.stopSessionTimer();
+                }
+            } else {
+                sessionContainer.style.display = 'none';
+                onlineIndicator.style.backgroundColor = '#ccc';
+                this.stopSessionTimer();
+            }
+        }
+
+
+        startSessionTimer(remainingSeconds) {
+            this.stopSessionTimer(); // Clear any existing timer
+            
+            // Update immediately
+            this.updateTimerDisplay(remainingSeconds);
+            
+            // Start interval
+            this.sessionTimerInterval = setInterval(() => {
+                remainingSeconds--;
+                this.updateTimerDisplay(remainingSeconds);
+                
+                if (remainingSeconds <= 0) {
+                    this.stopSessionTimer();
+                    if (this.sessionEndCallback) {
+                        this.sessionEndCallback();
+                    }
+                }
+            }, 1000);
+        }
+
+        updateTimerDisplay(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const timeString = `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+            
+            const timerDisplay = document.getElementById('session-timer-display');
+            if (timerDisplay) {
+                timerDisplay.textContent = timeString;
+            }
+        }
+
+
+        stopSessionTimer() {
+            if (this.sessionTimerInterval) {
+                clearInterval(this.sessionTimerInterval);
+                this.sessionTimerInterval = null;
+            }
+        }
+        
+        onSessionExpired() {
+            const sessionContainer = document.getElementById('session-timer-container');
+            if (sessionContainer) {
+                sessionContainer.style.display = 'none';
+            }
+            
+            // Optionally show a notification
+            this.showChatInfo('Session expired');
+        }
+
+        showChatInfo(message) {
+            const messagesContainer = document.getElementById('chat-messages-container');
+            if (messagesContainer) {
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'chat-info-message';
+                infoDiv.style.cssText = 'color: #666; padding: 10px; text-align: center; background: #f0f0f0; border-radius: 4px; margin: 10px; font-style: italic;';
+                infoDiv.textContent = message;
+                messagesContainer.appendChild(infoDiv);
+                setTimeout(() => infoDiv.remove(), 3000);
+            }
+        }
+        
+        
+
+
+
 
         // OPTIMIZED: Initialize with minimal DOM dependency
         async initialize() {
@@ -585,6 +715,9 @@
 
 
         destroy() {
+
+            this.stopSessionTimer();
+
             if (this.autoRefreshInterval) {
                 clearInterval(this.autoRefreshInterval);
                 this.autoRefreshInterval = null;

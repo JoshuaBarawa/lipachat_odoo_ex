@@ -27,6 +27,85 @@ class WhatsappChat(models.TransientModel):
     template_media_url = fields.Char(string="Media URL", help="URL for media in template header")
     show_media_url_field = fields.Boolean(compute="_compute_show_media_url_field")
 
+    session_start_time = fields.Datetime(string="Session Start Time")
+    session_duration = fields.Integer(string="Session Duration (seconds)", default=300)  # 5 minutes
+    session_active = fields.Boolean(string="Session Active", default=False)
+    session_remaining_time = fields.Integer(string="Session Remaining Time", compute="_compute_session_remaining")
+
+    @api.depends('session_start_time', 'session_duration')
+    def _compute_session_remaining(self):
+        for record in self:
+            if record.session_start_time and record.session_active:
+                elapsed = (fields.Datetime.now() - record.session_start_time).total_seconds()
+                remaining = max(0, record.session_duration - elapsed)
+                record.session_remaining_time = int(remaining)
+                
+                # Auto-expire session if time is up
+                if remaining <= 0:
+                    record.session_active = False
+            else:
+                record.session_remaining_time = 0
+
+
+
+    def start_session_tracking(self, partner_id):
+        """Start or extend session tracking for a contact"""
+        # Find existing session or create new one
+        session = self.search([
+            ('contact_partner_id', '=', partner_id),
+            ('create_uid', '=', self.env.uid)
+        ], limit=1)
+        
+        now = fields.Datetime.now()
+        if not session:
+            session = self.create({
+                'contact_partner_id': partner_id,
+                'contact': self.env['res.partner'].browse(partner_id).name,
+                'session_start_time': now,
+                'session_active': True,
+                'session_duration': 300  # 5 minutes
+            })
+            return True
+        else:
+            # Extend existing session
+            session.write({
+                'session_start_time': now,
+                'session_active': True,
+                'session_duration': 300
+            })
+            return True
+    
+
+
+    @api.model
+    def rpc_get_session_info(self, partner_id):
+        """Get session information for a specific partner"""
+        session = self.search([
+            ('contact_partner_id', '=', partner_id),
+            ('create_uid', '=', self.env.uid),
+            ('session_active', '=', True)
+        ], limit=1)
+        
+        if session and session.session_start_time:
+            elapsed = (fields.Datetime.now() - session.session_start_time).total_seconds()
+            remaining = max(0, session.session_duration - elapsed)
+            
+            # Auto-expire if time is up
+            if remaining <= 0:
+                session.session_active = False
+                return {'active': False}
+            
+            return {
+                'active': True,
+                'start_time': session.session_start_time.isoformat(),
+                'remaining_time': int(remaining),
+                'duration': session.session_duration
+            }
+        return {'active': False}
+
+
+
+
     @api.depends('template_id')
     def _compute_show_media_url_field(self):
         for record in self:
@@ -427,9 +506,7 @@ class WhatsappChat(models.TransientModel):
 
     @api.model
     def rpc_send_message(self, partner_id, message_text):
-        """
-        Dedicated RPC method for sending messages that doesn't rely on transient record state
-        """
+        """Dedicated RPC method for sending messages with session tracking"""
         if not partner_id:
             raise UserError("Please select a contact first")
         
@@ -455,9 +532,15 @@ class WhatsappChat(models.TransientModel):
             })
             
             message.send_message()
+            
+            # Start or extend session
+            session_started = self.start_session_tracking(partner.id)
+            
             return {
                 'status': 'success',
-                'message': f'Message sent to {partner.name}'
+                'message': f'Message sent to {partner.name}',
+                'session_started': session_started,
+                'session_info': self.rpc_get_session_info(partner.id)
             }
         except Exception as e:
             _logger.error(f"Failed to send message: {str(e)}")
@@ -595,20 +678,22 @@ class WhatsappChat(models.TransientModel):
     
     @api.model
     def get_initial_chat_data(self):
-        """Returns both recent contact and messages in one call for faster initialization"""
+        """Include session info in initial load"""
         most_recent = self.get_most_recent_contact()
         if not most_recent:
             return {
                 'contacts_html': self.rpc_get_contacts_html(),
                 'messages_html': '',
-                'partner_id': False
+                'partner_id': False,
+                'session_info': {'active': False}
             }
         
         return {
             'partner_id': most_recent['partner_id'],
             'partner_name': most_recent['name'],
             'contacts_html': self.rpc_get_contacts_html(),
-            'messages_html': self.rpc_get_messages_html(most_recent['partner_id'])
+            'messages_html': self.rpc_get_messages_html(most_recent['partner_id']),
+            'session_info': self.rpc_get_session_info(most_recent['partner_id'])
         }
 
     

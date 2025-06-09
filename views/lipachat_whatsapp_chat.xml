@@ -11,17 +11,41 @@
                          <!-- Hidden fields for state management -->
                         <field name="contact" invisible="1"/>
                         <field name="contact_partner_id" invisible="1"/>
+                        <field name="session_start_time" invisible="1"/>
+                        <field name="session_duration" invisible="1"/>
+                        <field name="session_active" invisible="1"/>
+                        <field name="session_remaining_time" invisible="1"/>
 
                         <div class="chat-container">
                             <div class="chat-contacts">
                                 <h3>Conversations</h3>
                                 <field name="contacts_html" widget="html" nolabel="1" class="o_whatsapp_contacts_html"/>
                             </div>
+
+
                             <div class="chat-area">
                                 <div class="chat-header">
                                     <div>
                                         <span class="online-indicator"></span>
                                         <strong id="chat-header-contact-name"><field name="contact" class="oe_inline" readonly="1" nolabel="1"/></strong>
+                                         
+                                         <div id="session-timer-container" style="display: none; margin-left: 15px; color: #666; font-size: 13px;">
+                                            <i class="fa fa-clock-o" style="margin-right: 4px;"/>
+                                            Session: <span id="session-timer-display">00:00</span>
+                                        </div>
+
+
+                                        <div id="session-controls" style="display: none; margin-left: 10px;">
+                                            <span class="btn btn-sm btn-success o_session_extend" style="padding: 2px 5px; font-size: 12px;">
+                                                <i class="fa fa-plus"/> Extend
+                                            </span>
+                                            <span class="btn btn-sm btn-danger o_session_end" style="padding: 2px 5px; font-size: 12px; margin-left: 5px;">
+                                                <i class="fa fa-stop"/> End
+                                            </span>
+                                        </div>
+
+
+
                                     </div>
                                     <field name="contact_partner_id" invisible="1"/>
                                 </div>
