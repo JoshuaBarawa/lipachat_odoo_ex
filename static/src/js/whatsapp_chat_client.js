@@ -133,6 +133,7 @@
                 
                 // Check session status first
                 const sessionInfo = await this.checkSessionStatus(partnerId);
+                this.updateInputFields(sessionInfo, partnerId);
                 
                 // Then load messages
                 const messagesHtml = await this.makeRpcCall(
@@ -402,7 +403,33 @@
             }
         }
 
+        updateInputFields(sessionInfo, partnerId) {
+            const hasContact = !!partnerId;
+            const isSessionActive = sessionInfo.active;
 
+            console.log("Contact is selected: " + hasContact)
+            console.log("Contact session is active: " + isSessionActive)
+            
+            // Normal message input (shown when session is active AND contact is selected)
+            const normalInput = document.getElementById('normal-message-input');
+            if (normalInput) {
+                normalInput.style.display = (isSessionActive && hasContact) ? 'block' : 'none';
+            }
+            
+            // Template message section (shown when session is NOT active AND contact is selected)
+            const templateSection = document.getElementById('template-message-btn');
+            if (templateSection) {
+                templateSection.style.display = (!isSessionActive && hasContact) ? 'block' : 'none';
+            }
+            
+            // If no contact is selected, hide both
+            if (!hasContact) {
+                if (normalInput) normalInput.style.display = 'none';
+                if (templateSection) templateSection.style.display = 'none';
+            }
+        }
+
+        
 
         async checkSessionStatus(partnerId) {
             try {
@@ -414,6 +441,8 @@
                 
                 this.sessionInfo = sessionInfo;
                 this.updateSessionUI(sessionInfo);
+
+                this.updateInputFields(sessionInfo, partnerId);
                 
                 return sessionInfo;
             } catch (error) {
@@ -506,7 +535,6 @@
         }
         
         
-
 
 
 
@@ -620,10 +648,44 @@
                 });
             }
         }
+
+
+        hideInputsOnLoad() {
+            // Try multiple times to ensure elements exist
+            const hideInputs = () => {
+                const normalInput = document.getElementById('normal-message-input');
+                const templateSection = document.getElementById('template-message-btn');
+                
+                console.log('Attempting to hide inputs:', { normalInput: !!normalInput, templateSection: !!templateSection });
+                
+                if (normalInput) {
+                    normalInput.style.display = 'none';
+                    console.log('Hidden normal input');
+                }
+                if (templateSection) {
+                    templateSection.style.display = 'none';
+                    console.log('Hidden template section');
+                }
+                
+                // If elements still don't exist, try again after a short delay
+                if (!normalInput || !templateSection) {
+                    setTimeout(hideInputs, 100);
+                }
+            };
+            
+            // Try immediately
+            hideInputs();
+            
+            // Also try after a short delay
+            setTimeout(hideInputs, 50);
+            setTimeout(hideInputs, 200);
+        }
         
 
         async _doInitialize() {
             console.log("WhatsApp Chat Client initializing...");
+
+            this.hideInputsOnLoad();
         
             // Start all async operations in parallel immediately
             const preloadPromise = this.preloadRecentContact();
@@ -667,6 +729,19 @@
             // Wait for preload to complete
             await Promise.all([preloadPromise, contactsPromise]);
             await Promise.all([preloadPromise, contactsPromise, templatesPromise]);
+
+
+            // const normalInput = document.getElementById('normal-message-input');
+            // const templateSection = document.getElementById('template-message-btn');
+
+            // if (normalInput) {
+            //     normalInput.style.display = 'none';
+            // }
+            // if (templateSection) {
+            //     templateSection.style.display = 'none';
+            // }
+
+            // this.updateInputFields({ active: false }, false);
         
             this.startAutoRefresh();
             this.isInitialized = true;

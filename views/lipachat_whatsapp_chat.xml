@@ -15,6 +15,11 @@
                         <field name="session_duration" invisible="1"/>
                         <field name="session_active" invisible="1"/>
                         <field name="session_remaining_time" invisible="1"/>
+                        <field name="show_media_url_field" invisible="1"/>
+                        <field name="show_template" invisible="1"/>
+                        <field name="can_send_message" invisible="1"/>
+                        <field name="show_message_section" invisible="1"/>
+            
 
                         <div class="chat-container">
                             <div class="chat-contacts">
@@ -24,6 +29,8 @@
 
 
                             <div class="chat-area">
+
+                                 <!-- Session header section -->
                                 <div class="chat-header">
                                     <div>
                                         <span class="online-indicator"></span>
@@ -32,52 +39,47 @@
                                          <div id="session-timer-container" style="display: none; margin-left: 15px; color: #666; font-size: 13px;">
                                             <i class="fa fa-clock-o" style="margin-right: 4px;"/>
                                             Session: <span id="session-timer-display">00:00</span>
-                                        </div>
-
-
-                                        <div id="session-controls" style="display: none; margin-left: 10px;">
-                                            <span class="btn btn-sm btn-success o_session_extend" style="padding: 2px 5px; font-size: 12px;">
-                                                <i class="fa fa-plus"/> Extend
-                                            </span>
-                                            <span class="btn btn-sm btn-danger o_session_end" style="padding: 2px 5px; font-size: 12px; margin-left: 5px;">
-                                                <i class="fa fa-stop"/> End
-                                            </span>
-                                        </div>
-
-
-
+                                        </div>             
                                     </div>
+
                                     <field name="contact_partner_id" invisible="1"/>
                                 </div>
+
+
+                                 <!-- Messages display area-->
                                 <div class="chat-messages-container" id="chat-messages-container">
                                     <field name="messages_html" widget="html" nolabel="1" class="o_whatsapp_messages_html"/>
                                 </div>
+
+
+                                  <!-- Chat inputs container area -->
                                 <div class="chat-input-container">
 
-                                    <field name="template_id" widget="many2one" 
-                                        options="{'no_open': True, 'no_create': True}" 
-                                        placeholder="Select a template..."
-                                        domain="[('status', '=', 'approved')]"/>
+                                     <!-- Send template message section -->
+                                     <div id="template-message-btn" class="btn btn-primary" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
+                                        <field name="template_id" widget="many2one" 
+                                            options="{'no_open': True, 'no_create': True}" 
+                                            placeholder="Select a template..."
+                                            domain="[('status', '=', 'approved')]"/>
 
-                                     <field name="show_media_url_field" invisible="1"/>
-
-                                    <div class="template-media-url-container" invisible="not show_media_url_field">
-                                        <field name="template_media_url" placeholder="Enter media URL (https://...)" nolabel="1"/>
+                                        <div class="template-media-url-container" invisible="not show_media_url_field">
+                                            <field name="template_media_url" placeholder="Enter media URL (https://...)" nolabel="1"/>
+                                        </div>
+                                        <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
                                     </div>
 
 
-                                    
-                                    <div class="template-preview" style="padding: 8px; margin: 5px 0; background: #f8f9fa; border-radius: 4px;"
-                                         invisible="[('template_preview', '=', False)]">
-                                        <field name="template_preview" widget="html" nolabel="1"/>
-                                    </div>
+                                    <!-- Send text message section -->
+                                    <div id="normal-message-input">
+                                        <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/> 
+                                        <div class="btn btn-primary o_whatsapp_send_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
+                                            <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send
+                                        </div>
+                                    </div>       
 
-
-                                    <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/>  
-                                     <div class="btn btn-primary o_whatsapp_send_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
-                                        <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send
-                                    </div>
                                 </div>
+
+
                             </div>
                         </div>
                     </sheet>

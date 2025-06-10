@@ -32,6 +32,59 @@ class WhatsappChat(models.TransientModel):
     session_active = fields.Boolean(string="Session Active", default=False)
     session_remaining_time = fields.Integer(string="Session Remaining Time", compute="_compute_session_remaining")
 
+    can_send_message = fields.Boolean(compute='_compute_can_send_message')
+    show_template = fields.Boolean(compute='_compute_show_template')
+
+    show_message_section = fields.Boolean(compute='_compute_show_message_section')
+
+    @api.depends('session_active', 'contact_partner_id')
+    def _compute_can_send_message(self):
+        _logger.info("Records to process: %s", self)
+        _logger.info("Number of records: %s", len(self))
+        
+        if not self:
+            _logger.info("No records to process - self is empty")
+            return
+        
+        for record in self:
+            _logger.info("Processing record ID: %s", record.id)
+            _logger.info("Record session_active: %s", record.session_active)
+            _logger.info("Record contact_partner_id: %s", record.contact_partner_id)
+            _logger.info("Record contact_partner_id (bool): %s", bool(record.contact_partner_id))
+            
+            record.can_send_message = record.session_active and bool(record.contact_partner_id)
+            _logger.info("Computed can_send_message: %s", record.can_send_message)
+
+
+    @api.depends('session_active', 'contact_partner_id')
+    def _compute_show_template(self):
+        _logger.info("Records to process: %s", self)
+        _logger.info("Number of records: %s", len(self))
+        
+        if not self:
+            _logger.info("No records to process - self is empty")
+            return
+        
+        for record in self:
+            _logger.info("Processing record ID: %s", record.id)
+            _logger.info("Record session_active: %s", record.session_active)
+            _logger.info("Record contact_partner_id: %s", record.contact_partner_id)
+            _logger.info("Record contact_partner_id (bool): %s", bool(record.contact_partner_id))
+            
+            record.show_template = bool(record.contact_partner_id) and not record.session_active
+            _logger.info("Computed show_template: %s", record.show_template)
+    
+
+    @api.depends('contact_partner_id')
+    def _compute_show_message_section(self):
+        
+        for record in self:
+            record.show_message_section = bool(record.contact_partner_id)
+            _logger.info("Computed show message section: %s", record.show_message_section)
+
+
+
+
     @api.depends('session_start_time', 'session_duration')
     def _compute_session_remaining(self):
         for record in self:
@@ -280,6 +333,12 @@ class WhatsappChat(models.TransientModel):
                     if record.contact_partner_id == partner_id:
                         selected_style = 'background-color: #e8f5e8; border: 2px solid #25D366;'
                         selected_class = 'selected'
+                    
+                    session = self.env['whatsapp.chat'].search([
+                    ('contact_partner_id', '=', partner_id),
+                    ('create_uid', '=', self.env.uid)], limit=1)
+                    is_expired = not (session and session.session_active)
+                    contact_color = 'red' if is_expired else '#25D366'
                     
                     # No need to escape for onlick here, as it's handled by a global JS handler now
                     html += f'''
