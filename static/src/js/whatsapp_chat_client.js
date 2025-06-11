@@ -18,6 +18,9 @@
             this.sessionInfo = {};
             this.sessionTimerInterval = null;
             this.sessionEndCallback = null;
+            this.currentUrl = window.location.href;
+            this.urlCheckInterval = null;
+            this.mutationObserver = null;
         }
 
         addEventListener(element, event, handler) {
@@ -413,7 +416,7 @@
             // Normal message input (shown when session is active AND contact is selected)
             const normalInput = document.getElementById('normal-message-input');
             if (normalInput) {
-                normalInput.style.display = (isSessionActive && hasContact) ? 'block' : 'none';
+                normalInput.style.display = (isSessionActive && hasContact) ? 'flex' : 'none';
             }
             
             // Template message section (shown when session is NOT active AND contact is selected)
@@ -680,11 +683,229 @@
             setTimeout(hideInputs, 50);
             setTimeout(hideInputs, 200);
         }
+
+
+
+
+
+
+        // Method 1: Enhanced URL monitoring with multiple detection methods
+        setupUrlMonitoring() {
+            // Store original URL
+            this.currentUrl = window.location.href;
+            
+            // Method 1a: Override history methods
+            const originalPushState = history.pushState;
+            const originalReplaceState = history.replaceState;
+            
+            history.pushState = (...args) => {
+                originalPushState.apply(history, args);
+                console.log('PushState detected');
+                setTimeout(() => this.handleUrlChange(), 100);
+            };
+            
+            history.replaceState = (...args) => {
+                originalReplaceState.apply(history, args);
+                console.log('ReplaceState detected');
+                setTimeout(() => this.handleUrlChange(), 100);
+            };
+            
+            // Method 1b: Listen for popstate (back/forward buttons)
+            this.addEventListener(window, 'popstate', () => {
+                console.log('Popstate detected');
+                setTimeout(() => this.handleUrlChange(), 100);
+            });
+            
+            // Method 1c: Periodic URL checking as fallback
+            this.urlCheckInterval = setInterval(() => {
+                if (window.location.href !== this.currentUrl) {
+                    const oldUrl = this.currentUrl;
+                    this.currentUrl = window.location.href;
+                    console.log('Periodic check: URL changed from', oldUrl, 'to', this.currentUrl);
+                    this.handleUrlChange();
+                }
+            }, 1000);
+            
+            // Method 1d: DOM mutation observer for dynamic content changes
+            this.mutationObserver = new MutationObserver((mutations) => {
+                // Check if breadcrumbs or other navigation elements changed
+                const hasNavigationChange = mutations.some(mutation => {
+                    return Array.from(mutation.addedNodes).some(node => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            return node.querySelector && (
+                                node.querySelector('.breadcrumb') ||
+                                node.querySelector('.o_action_manager') ||
+                                node.classList.contains('o_action_manager')
+                            );
+                        }
+                        return false;
+                    });
+                });
+                
+                if (hasNavigationChange) {
+                    console.log('DOM navigation change detected');
+                    setTimeout(() => this.handleUrlChange(), 200);
+                }
+            });
+            
+            this.mutationObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+
+        
+         // Method 2: Handle URL changes and run your method
+        handleUrlChange() {
+            console.log('Handling URL change:', window.location.href);
+            
+            // Run your method every time
+            const isWhatsAppInterface = this.isLipachatChatInterfaceView();
+            
+            if (isWhatsAppInterface) {
+                console.log('WhatsApp interface detected - reinitializing');
+                // Reinitialize if needed
+                this.reinitializeForWhatsApp();
+            } else {
+                console.log('Not WhatsApp interface - cleaning up if needed');
+                this.cleanupForNonWhatsApp();
+            }
+        }
+
+
+
+        // Method 3: Enhanced interface detection
+        isLipachatChatInterfaceView() {
+            console.log('Checking if current page is WhatsApp interface...');
+            
+            // Check URL for lipachat.template
+            const url = window.location.href;
+            if (url.includes('model=whatsapp.chat') || url.includes('whatsapp.chat')) {
+                console.log('Detected lipachat whatsapp interface via URL!!');
+                return true;
+            }
+            
+            // Check breadcrumbs or page title
+            const breadcrumbs = document.querySelector('.breadcrumb');
+            if (breadcrumbs && breadcrumbs.textContent.includes('WhatsApp Chat Interface')) {
+                console.log('Detected lipachat whatsapp interface via breadcrumbs!!');
+                return true;
+            }
+            
+            // Additional checks for specific elements
+            const whatsappElements = document.querySelector('.o_whatsapp_chat_interface') ||
+                                document.querySelector('.chat-container') ||
+                                document.querySelector('#chat-messages-container');
+            
+            if (whatsappElements) {
+                console.log('Detected lipachat whatsapp interface via elements!!');
+                return true;
+            }
+            
+            console.log('No whatsapp interface detected!');
+            return false;
+        }
+
+
+
+        // Method 4: Reinitialize when WhatsApp interface is detected
+        reinitializeForWhatsApp() {
+            // if (this.isInitialized) {
+            //     console.log('Already initialized for WhatsApp');
+            //     return;
+            // }
+            
+            console.log('Reinitializing for WhatsApp interface');
+            this.hideInputsOnLoad();
+            
+            // Reset initialization state
+            this.isInitialized = false;
+            this.initPromise = null;
+            
+            // Initialize again
+            this.initialize().catch(error => {
+                console.error("Failed to reinitialize WhatsApp Chat:", error);
+            });
+        }
+
+
+        // Method 5: Cleanup when not on WhatsApp interface
+        cleanupForNonWhatsApp() {
+            if (this.autoRefreshInterval) {
+                clearInterval(this.autoRefreshInterval);
+                this.autoRefreshInterval = null;
+            }
+            
+            // Reset selected contact
+            this.currentSelectedPartnerId = null;
+            this.currentSelectedContactName = null;
+            this.lastMessageId = 0;
+            
+            console.log('Cleaned up for non-WhatsApp interface');
+        }
+
+
+        isLipachatChatInterfaceView() {
+            // Check URL for lipachat.template
+            const url = window.location.href;
+            if (url.includes('model=whatsapp.chat') || url.includes('whatsapp.chat')) {
+                console.log('Detected lipachat whatsapp interface!!');
+                return true;
+            }
+            
+            // Check breadcrumbs or page title
+            const breadcrumbs = document.querySelector('.breadcrumb');
+            if (breadcrumbs && breadcrumbs.textContent.includes('WhatsApp Chat Interface')) {
+                console.log('Detected lipachat whatsapp interface!!');
+                return true;
+            }
+
+            console.log('No whatsapp interface detected!');
+            
+            return false;
+        }
+
+
+        // const originalPushState = history.pushState;
+        // const originalReplaceState = history.replaceState;
+    
+        // history.pushState = function(...args) {
+        //     originalPushState.apply(history, args);
+        //     console.log('PushState detected');
+        //     setTimeout(handlePageLoad, 300);
+        // };
+    
+        // history.replaceState = function(...args) {
+        //     originalReplaceState.apply(history, args);
+        //     console.log('ReplaceState detected');
+        //     setTimeout(handlePageLoad, 300);
+        // };
+    
+        // // Method 4: Periodic URL checking as fallback
+        // setInterval(() => {
+        //     if (window.location.href !== currentUrl) {
+        //         const oldUrl = currentUrl;
+        //         currentUrl = window.location.href;
+        //         console.log('Periodic check: URL changed from', oldUrl, 'to', currentUrl);
+        //         handlePageLoad();
+        //     }
+        // }, 1000);
+
+
+
+
+
+
         
 
         async _doInitialize() {
             console.log("WhatsApp Chat Client initializing...");
-
+            
+            if (!this.isLipachatChatInterfaceView()) {
+                console.log('Not on WhatsApp interface - skipping initialization');
+                return;
+            }
+        
             this.hideInputsOnLoad();
         
             // Start all async operations in parallel immediately
@@ -797,6 +1018,19 @@
                 clearInterval(this.autoRefreshInterval);
                 this.autoRefreshInterval = null;
             }
+
+
+            // Stop URL monitoring
+            if (this.urlCheckInterval) {
+                clearInterval(this.urlCheckInterval);
+                this.urlCheckInterval = null;
+            }
+
+            if (this.mutationObserver) {
+                this.mutationObserver.disconnect();
+                this.mutationObserver = null;
+            }
+
             
             this.eventListeners.forEach(({ element, event, handler }) => {
                 element.removeEventListener(event, handler);
@@ -813,18 +1047,23 @@
     let initializationAttempted = false;
 
     function initializeWhatsAppChat() {
-        if (initializationAttempted) return;
-        initializationAttempted = true;
+        // if (initializationAttempted) return;
+        // initializationAttempted = true;
         
         if (whatsappChatClient) {
             whatsappChatClient.destroy();
         }
         
         whatsappChatClient = new WhatsAppChatClient();
-        whatsappChatClient.initialize().catch(error => {
-            console.error("Failed to initialize WhatsApp Chat:", error);
-            initializationAttempted = false;
-        });
+
+        whatsappChatClient.setupUrlMonitoring();
+
+        whatsappChatClient.handleUrlChange();
+
+        // whatsappChatClient.initialize().catch(error => {
+        //     console.error("Failed to initialize WhatsApp Chat:", error);
+        //     initializationAttempted = false;
+        // });
     }
 
 

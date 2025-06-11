@@ -56,24 +56,33 @@
                                 <div class="chat-input-container">
 
                                      <!-- Send template message section -->
-                                     <div id="template-message-btn" class="btn btn-primary" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
-                                        <field name="template_id" widget="many2one" 
-                                            options="{'no_open': True, 'no_create': True}" 
-                                            placeholder="Select a template..."
-                                            domain="[('status', '=', 'approved')]"/>
+                                     <div id="template-message-btn" class="send_temp_section">
 
-                                        <div class="template-media-url-container" invisible="not show_media_url_field">
-                                            <field name="template_media_url" placeholder="Enter media URL (https://...)" nolabel="1"/>
+                                        <div class="template_media_inputs_sec">
+                                            <field name="template_id" widget="many2one" class="template_select_dropdown"
+                                                options="{'no_open': True, 'no_create': True}" 
+                                                placeholder="Select a template..."
+                                                domain="[('status', '=', 'approved')]"/>
+
+                                            <div class="template-media-url-container" invisible="not show_media_url_field">
+                                                <field name="template_media_url" 
+                                                placeholder="Enter media URL (https://...)" nolabel="1"/>
+                                            </div>
                                         </div>
-                                        <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
+
+                                        <field name="new_message" class="template_message_area" widget="textarea" invisible="not template_id" no_label="1"/> 
+
+                                        <div class="btn btn-primary" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
+                                             <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
+                                        </div>       
                                     </div>
 
 
                                     <!-- Send text message section -->
-                                    <div id="normal-message-input">
+                                    <div id="normal-message-input" class="text-message-input-sec">
                                         <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/> 
                                         <div class="btn btn-primary o_whatsapp_send_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
-                                            <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send
+                                            <i class="fa fa-paper-plane" style="margin-right: 7px;"/> Send
                                         </div>
                                     </div>       
 
