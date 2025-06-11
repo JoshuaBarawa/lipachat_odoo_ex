@@ -70,7 +70,7 @@
                                             </div>
                                         </div>
 
-                                        <field name="new_message" class="template_message_area" widget="textarea" invisible="not template_id" no_label="1"/> 
+                                        <field name="template_message_textarea" class="template_message_area" widget="textarea" invisible="not template_id" no_label="1"/> 
 
                                         <div class="btn btn-primary" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
                                              <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template

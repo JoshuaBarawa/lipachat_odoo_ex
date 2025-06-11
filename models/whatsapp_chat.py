@@ -23,7 +23,7 @@ class WhatsappChat(models.TransientModel):
     template_id = fields.Many2one('lipachat.template', string="Template")
     template_preview = fields.Html(string="Template Preview", compute="_compute_template_preview")
 
-
+    template_message_textarea = fields.Text()
     template_media_url = fields.Char(string="Media URL", help="URL for media in template header")
     show_media_url_field = fields.Boolean(compute="_compute_show_media_url_field")
 
@@ -34,7 +34,6 @@ class WhatsappChat(models.TransientModel):
 
     can_send_message = fields.Boolean(compute='_compute_can_send_message')
     show_template = fields.Boolean(compute='_compute_show_template')
-
     show_message_section = fields.Boolean(compute='_compute_show_message_section')
 
     @api.depends('session_active', 'contact_partner_id')
@@ -193,7 +192,7 @@ class WhatsappChat(models.TransientModel):
         if self.template_id:
             self.template_media_url = False
             if self.template_id.body_text:
-                self.new_message = self.template_id.body_text
+                self.template_message_textarea = self.template_id.body_text
 
 
 
