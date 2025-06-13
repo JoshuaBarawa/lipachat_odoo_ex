@@ -170,11 +170,50 @@ class WhatsappChat(models.TransientModel):
             timeout=30
         )
 
+        response_data = response.json() if response.content else {}
+
+        _logger.info("Response Body:\n%s", json.dumps(response_data, indent=2)) 
+        # Determine state based on response
+        if response_data.get('status') == 'success':
+            message = self.env['lipachat.message'].create({
+                'partner_id': 3,
+                'phone_number': "254717916656",
+                'config_id': config.id,
+                'message_type': 'template',
+                'message_text': '',
+                'state': 'sent'
+            })
+            _logger.info("Template message sent successfully")
+            message.send_message()
+        else:
+            message = self.env['lipachat.message'].create({
+                'partner_id': 3,
+                'phone_number': "254717916656",
+                'config_id': config.id,
+                'message_type': 'template',
+                'message_text': '',
+                'state': 'failed'
+            })
+            _logger.error("Template message failed to send: %s", response_data.get('message', 'Unknown error'))
+            message.send_message()
+
+        self._clear_template_data()
+
         _logger.info("Response Body:\n%s", json.dumps(response.json(), indent=2) if response.content else "Empty response")
 
 
         return response
-
+    
+    def _clear_template_data(self):
+        """Clear template form data after sending"""
+        self.write({
+            'template_name': False,
+            'template_header_text': 'TEXT',
+            'template_header_type': '',
+            'template_media_url': '',
+            'template_variables': '',
+            'template_placeholders': ''
+        })
 
     @api.depends('session_active', 'contact_partner_id')
     def _compute_can_send_message(self):
