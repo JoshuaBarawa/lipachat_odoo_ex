@@ -19,6 +19,7 @@
                         <field name="show_template" invisible="1"/>
                         <field name="can_send_message" invisible="1"/>
                         <field name="show_message_section" invisible="1"/>
+                        <field name="template_header_type" invisible="1"/>
             
 
                         <div class="chat-container">
@@ -55,6 +56,37 @@
                                   <!-- Chat inputs container area -->
                                 <div class="chat-input-container">
 
+
+                               <group string="Template Message">
+                                    <field name="template_name" placeholder="Select a template..."/>
+
+                                     <!-- Media URL field (only shown if template has media) -->
+                                 <field name="template_media_url" invisible="not template_name or template_header_type == 'TEXT'"/>
+
+                                <!-- Show header_text when header_type IS 'TEXT' -->
+                                <field name="template_header_text" invisible="template_header_type != 'TEXT'" widget="char"/>
+                                <field name="template_body_text" invisible="not template_name"/>
+ 
+
+                                <!-- 
+                                    <field name="template_placeholders" 
+                                        string="Template Variables"
+                                        widget="text" 
+                                        placeholder="Enter values for template variables as JSON (e.g., {'name': 'John', 'company': 'ABC Corp'})"
+                                        invisible="template_variables == '[]'"
+                                        /> -->
+
+                                        <button name="send_template_message_v2" string="Send Temp" type="object" class="btn-primary"/>
+                                </group>
+
+
+
+
+
+
+
+                                    
+
                                      <!-- Send template message section -->
                                      <div id="template-message-btn" class="send_temp_section">
 
@@ -72,7 +104,7 @@
 
                                         <field name="template_message_textarea" class="template_message_area" widget="textarea" invisible="not template_id" no_label="1"/> 
 
-                                        <div class="btn btn-primary" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
+                                        <div class="btn btn-primary o_whatsapp_send_template_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
                                              <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
                                         </div>       
                                     </div>

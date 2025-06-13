@@ -4,6 +4,10 @@ from odoo import models, fields, api
 from datetime import datetime, timedelta
 import logging
 import json # Import json for RPC response
+from odoo.exceptions import ValidationError
+import re
+import requests
+import uuid
 
 _logger = logging.getLogger(__name__)
 
@@ -28,13 +32,149 @@ class WhatsappChat(models.TransientModel):
     show_media_url_field = fields.Boolean(compute="_compute_show_media_url_field")
 
     session_start_time = fields.Datetime(string="Session Start Time")
-    session_duration = fields.Integer(string="Session Duration (seconds)", default=300)  # 5 minutes
+    session_duration = fields.Integer(string="Session Duration (seconds)", default=60)  # 5 minutes
     session_active = fields.Boolean(string="Session Active", default=False)
     session_remaining_time = fields.Integer(string="Session Remaining Time", compute="_compute_session_remaining")
 
     can_send_message = fields.Boolean(compute='_compute_can_send_message')
     show_template = fields.Boolean(compute='_compute_show_template')
     show_message_section = fields.Boolean(compute='_compute_show_message_section')
+    
+
+    # Template fields
+    template_name = fields.Many2one('lipachat.template', string='Template')
+    template_header_text = fields.Text()
+    template_body_text = fields.Text()
+    template_header_type = fields.Char('Header Type', store=False)
+   
+    
+    template_media_url = fields.Char('Media URL')
+    template_variables = fields.Text('Template Variables', compute='_compute_template_variables', store=False)
+    template_placeholders = fields.Text('Placeholder Values', default='[]')
+    partner_id = fields.Many2one('res.partner', 'Contact')
+    message_id = fields.Char('Message ID', required=True, default=lambda self: str(uuid.uuid4()))
+
+
+    template_components = fields.Json('Template Components')
+
+    @api.onchange('template_name')
+    def _onchange_template_name(self):
+        """Update header type when template changes"""
+        if self.template_name:
+            self.template_header_type = self.template_name.header_type
+            _logger.info("Template header type: %s", self.template_header_type)
+        else:
+            self.template_header_type = False
+        
+
+    @api.onchange('template_name')
+    def _compute_template_variables(self):
+        _logger.info("Extracting template variables: ", self.template_name.name)
+        for record in self:
+            if record.template_name and record.template_name.body_text:
+                # Find all variables like {{1}}, {{2}}, etc.
+                variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body_text)
+                record.template_variables = json.dumps(list(set(variables)))  # Remove duplicates
+            else:
+                record.template_variables = '[]'
+        _logger.info("Extracted this variables: ", self.template_variables)
+
+    
+    @api.onchange('template_name', 'template_media_url')
+    def _prepare_template_components(self):
+        """Prepare the components dictionary for template messages"""
+        _logger.info("Template name exists: %s", bool(self.template_name))
+        
+        components = {}
+        
+        if self.template_name:
+            if self.template_name.header_type in ["IMAGE", "VIDEO", "DOCUMENT"]:
+                _logger.info("Taking IMAGE/VIDEO/DOCUMENT branch")
+                components = {
+                    "header": {
+                        'type': self.template_name.header_type,
+                        'mediaUrl': self.template_media_url
+                    },
+                    'body': {
+                        'placeholders':["Joshua"],
+                    }  
+                }
+            else:
+                _logger.info("Taking TEXT branch")
+                components = {
+                    "header": {
+                        'type': "TEXT",
+                        'parameter': self.template_variables
+                    },
+                    'body': {
+                        'placeholders': self.template_variables,
+                    }  
+                }
+        # Assign to a field if you have one
+        _logger.info("Final components: %s", components)
+        self.template_components = components
+        
+        return components
+    
+
+    def send_template_message_v2(self, context=None):
+        """Send WhatsApp template message with session tracking"""
+
+         # Add debugging
+        _logger.info("Template name field: %s", self.template_name)
+        _logger.info("Template name ID: %s", self.template_name.id if self.template_name else None)
+        _logger.info("Template name exists: %s", bool(self.template_name))
+
+        config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
+        if not config:
+            raise ValidationError("No active LipaChat configuration found")
+
+        if not self.template_name or not self.template_name.id:
+            raise ValidationError("Please select template")
+    
+        if self.template_header_type != "TEXT" and not self.template_media_url:
+            raise ValidationError(f"Media URL is required for header type: {self.template_header_type}")
+    
+        
+       
+        self.message_id = str(uuid.uuid4())
+
+        components = self._prepare_template_components()
+        
+        template_data = {
+            'name': self.template_name.name,
+            'languageCode': self.template_name.language,
+            'components':  components
+        }
+
+        _logger.info("Template Data:\n%s", json.dumps(template_data, indent=2, sort_keys=True))
+
+        headers = {
+            'apiKey': config.api_key,
+            'Content-Type': 'application/json'
+        }
+
+        data = {
+            "messageId": self.message_id,
+            "to": "254717916656",
+            "from": config.default_from_number,
+            "template": template_data
+        }
+
+        _logger.info("Request Data:\n%s", json.dumps(data, indent=2, sort_keys=True))
+
+        response = requests.post(
+            f"{config.api_base_url}/whatsapp/template",
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+
+        _logger.info("Response Body:\n%s", json.dumps(response.json(), indent=2) if response.content else "Empty response")
+
+
+        return response
+
 
     @api.depends('session_active', 'contact_partner_id')
     def _compute_can_send_message(self):
@@ -115,7 +255,7 @@ class WhatsappChat(models.TransientModel):
                 'contact': self.env['res.partner'].browse(partner_id).name,
                 'session_start_time': now,
                 'session_active': True,
-                'session_duration': 300  # 5 minutes
+                'session_duration': 60  # 5 minutes
             })
             return True
         else:
@@ -123,7 +263,7 @@ class WhatsappChat(models.TransientModel):
             session.write({
                 'session_start_time': now,
                 'session_active': True,
-                'session_duration': 300
+                'session_duration': 60
             })
             return True
     
@@ -201,19 +341,19 @@ class WhatsappChat(models.TransientModel):
         Dedicated method for sending template messages
         """
         if not partner_id:
-            raise UserError("Please select a contact first")
+            raise ValidationError("Please select a contact first")
 
         partner = self.env['res.partner'].browse(partner_id)
         if not partner.exists():
-            raise UserError("Selected contact not found")
+            raise ValidationError("Selected contact not found")
 
-        template = self.env['lipachat.template'].browse(template_id)
+        template = self.env['lipachat.template'].search([('name', '=', template_id)], limit=1)
         if not template.exists():
-            raise UserError("Selected template not found")
+            raise ValidationError("Selected template not found: ", template_id)
 
         config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
         if not config:
-            raise UserError("No active LipaChat configuration found")
+            raise ValidationError("No active LipaChat configuration found")
 
         try:
             # Prepare template components
@@ -257,7 +397,7 @@ class WhatsappChat(models.TransientModel):
             }
         except Exception as e:
             _logger.error(f"Failed to send template message: {str(e)}")
-            raise UserError(f"Failed to send template message: {str(e)}")
+            raise ValidationError(f"Failed to send template message: {str(e)}")
         
 
 

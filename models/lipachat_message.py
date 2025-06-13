@@ -91,49 +91,6 @@ class LipachatMessage(models.Model):
     # Computed field for truncated message display
     message_text_short = fields.Char('Content Preview', compute='_compute_message_text_short', store=False)
 
-    @api.model
-    def check_session_status(self, partner_id):
-        """Check session status for a partner"""
-        whatsapp_chat = self.env['whatsapp.chat']
-        return whatsapp_chat.rpc_get_session_info(partner_id)
-    
-
-    def get_active_session(self, partner_id):
-        """Get active session for a partner"""
-        return self.env['whatsapp.chat'].search([
-            ('contact_partner_id', '=', partner_id),
-            ('session_active', '=', True)
-        ], limit=1)
-
-    def extend_session(self, partner_id, duration=300):
-        """Extend an existing session"""
-        whatsapp_chat = self.env['whatsapp.chat']
-        session = whatsapp_chat.search([
-            ('contact_partner_id', '=', partner_id),
-            ('create_uid', '=', self.env.uid)
-        ], limit=1)
-        
-        if session:
-            session.write({
-                'session_start_time': fields.Datetime.now(),
-                'session_active': True,
-                'session_duration': duration
-            })
-            return True
-        return False
-
-    def end_session(self, partner_id):
-        """End an active session"""
-        session = self.get_active_session(partner_id)
-        if session:
-            session.write({
-                'session_active': False
-            })
-            return True
-        return False
-    
-
-
     @api.depends('template_name')
     def _compute_template_variables(self):
         for record in self:
@@ -273,10 +230,6 @@ class LipachatMessage(models.Model):
                 }
                 if msg._send_single_message(recipient, config):
                     success_count += 1
-                    
-                    # For direct messages (not part of bulk), track session
-                    if not self.is_bulk_template and recipient.get('partner_id'):
-                        self.env['whatsapp.chat'].start_session_tracking(recipient['partner_id'])
             except Exception as e:
                 _logger.error(f"Failed to send individual message {msg.id}: {str(e)}")
         
@@ -297,11 +250,9 @@ class LipachatMessage(models.Model):
         self.failed_contacts = '\n'.join(failed_contacts) if failed_contacts else ''
         
         return True
-    
-
 
     def _send_single_message(self, recipient, config):
-        """Send message to a single recipient and track session"""
+        """Send message to a single recipient"""
         headers = {
             'apiKey': config.api_key,
             'Content-Type': 'application/json'
@@ -312,11 +263,6 @@ class LipachatMessage(models.Model):
             if send_method(config, headers, recipient):
                 self.state = 'sent'
                 self.sent_contacts = f"{recipient['name']} ({recipient['phone']})"
-                
-                # Start or extend session if this is a direct message (not bulk)
-                if not self.is_bulk_template and recipient.get('partner_id'):
-                    self.env['whatsapp.chat'].start_session_tracking(recipient['partner_id'])
-                
                 return True
             else:
                 self.state = 'failed'
@@ -329,7 +275,6 @@ class LipachatMessage(models.Model):
             self.error_message = str(e)
             self.failed_contacts = f"{recipient['name']} ({recipient['phone']}): {str(e)}"
             return False
-        
     
     def _send_text_message(self, config, headers, recipient):
         data = {
@@ -367,7 +312,6 @@ class LipachatMessage(models.Model):
         
         return self._handle_response(response)
     
-
     def _send_buttons_message(self, config, headers, recipient):
         buttons_data = json.loads(self.buttons_data) if self.buttons_data else []
         
@@ -386,12 +330,8 @@ class LipachatMessage(models.Model):
             timeout=30
         )
         
-        result = self._handle_response(response)
-        if result and not self.is_bulk_template and recipient.get('partner_id'):
-            self.env['whatsapp.chat'].start_session_tracking(recipient['partner_id'])
-        return result
+        return self._handle_response(response)
     
-
     def _send_list_message(self, config, headers, recipient):
         buttons_data = json.loads(self.buttons_data) if self.buttons_data else []
         
@@ -412,56 +352,32 @@ class LipachatMessage(models.Model):
             timeout=30
         )
         
-        result = self._handle_response(response)
-        if result and not self.is_bulk_template and recipient.get('partner_id'):
-            self.env['whatsapp.chat'].start_session_tracking(recipient['partner_id'])
-        return result
-
+        return self._handle_response(response)
     
-    def send_template_message(self, template_data=None):
-        """Send WhatsApp template message with session tracking"""
-        config = self.config_id
-        if not config:
-            raise ValidationError(_("Please select a valid LipaChat configuration."))
-
-        # Use provided template data or prepare from record
-        if template_data is None:
-            template_data = {
-                'name': self.template_name.name,
-                'languageCode': self.template_name.language_code or 'en',
-                'components': self._prepare_template_components()
-            }
-
-        headers = {
-            'apiKey': config.api_key,
-            'Content-Type': 'application/json'
-        }
-
+    def _send_template_message(self, config, headers, recipient):
+       
         data = {
             "messageId": self.message_id,
-            "to": self._clean_phone_number(self.phone_number),
+            "to": recipient['phone'],
             "from": self.from_number or config.default_from_number,
-            "template": template_data
+            "template": {
+                "name": self.template_name.name,
+                "languageCode": "en",
+                "components": self._prepare_template_components()
+            }
         }
-
+        
         response = requests.post(
             f"{config.api_base_url}/whatsapp/template",
             headers=headers,
             json=data,
             timeout=30
         )
-
-        if self._handle_response(response):
-            # Start or extend session if this is a direct message (not bulk)
-            if not self.is_bulk_template and self.partner_id:
-                self.env['whatsapp.chat'].start_session_tracking(self.partner_id.id)
-            return True
-        return False
-    
-
+        
+        return self._handle_response(response)
     
     def _handle_response(self, response):
-        """Handle API response and update message status with session info"""
+        """Handle API response and update message status accordingly"""
         try:
             response_data = response.json()
             
@@ -482,11 +398,6 @@ class LipachatMessage(models.Model):
             
             # Check the actual message status in the response
             if response_data.get('data', {}).get('status') == 'SENT':
-                # Add session info to response if this is a direct message
-                if not self.is_bulk_template and self.partner_id:
-                    session_info = self.env['whatsapp.chat'].rpc_get_session_info(self.partner_id.id)
-                    response_data['session_info'] = session_info
-                    self.response_data = json.dumps(response_data)
                 return True
             else:
                 _logger.warning(f"Message sent but with unexpected status: {response_data}")

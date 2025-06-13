@@ -574,14 +574,15 @@
             this.isSending = true;
         
             try {
-                const templateField = document.querySelector('input[name="template_id"]') || 
-                                    document.querySelector('.o_field_many2one[name="template_id"]');
-                const templateId = templateField && templateField.value ? parseInt(templateField.value) : null;
                 
-                if (!this.currentSelectedPartnerId) {
-                    this.showChatError('Please select a contact first');
-                    return;
-                }
+                const templateField = document.querySelector('.o_field_many2one input') || 
+                                    document.querySelector('.o_field_widget[name="template_id"] input');
+                const templateId = templateField && templateField.value ? templateField.value : null;
+                
+                // if (!this.currentSelectedPartnerId) {
+                //     this.showChatError('Please select a contact first');
+                //     return;
+                // }
         
                 if (!templateId) {
                     this.showChatError('Please select a template');
@@ -605,7 +606,7 @@
                 const result = await this.makeRpcCall(
                     'whatsapp.chat',
                     'send_template_message',
-                    [parseInt(this.currentSelectedPartnerId), templateId, mediaUrl]
+                    [templateId, parseInt(this.currentSelectedPartnerId), mediaUrl]
                 );
         
                 if (result && result.status === 'success') {
@@ -940,6 +941,16 @@
                     event.preventDefault();
                     event.stopPropagation();
                     this.handleSendMessage();
+                }
+            });
+
+
+            this.addEventListener(document, 'click', (event) => {
+                if (event.target.matches('.o_whatsapp_send_template_button') || 
+                    event.target.closest('.o_whatsapp_send_template_button')) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this.handleSendTemplate();
                 }
             });
         
