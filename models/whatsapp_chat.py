@@ -49,8 +49,8 @@ class WhatsappChat(models.TransientModel):
    
     
     template_media_url = fields.Char('Media URL')
-    template_variables = fields.Text('Template Variables', compute='_compute_template_variables', store=False)
-    template_placeholders = fields.Text('Placeholder Values', default='[]')
+    template_variables = fields.Json('Template Variables', compute='_compute_template_variables', store=False)
+    template_placeholders = fields.Json('Placeholder Values', default='[]')
     partner_id = fields.Many2one('res.partner', 'Contact')
     message_id = fields.Char('Message ID', required=True, default=lambda self: str(uuid.uuid4()))
 
@@ -74,141 +74,157 @@ class WhatsappChat(models.TransientModel):
             if record.template_name and record.template_name.body_text:
                 # Find all variables like {{1}}, {{2}}, etc.
                 variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body_text)
-                record.template_variables = json.dumps(list(set(variables)))  # Remove duplicates
+                record.template_variables = list(set(variables))  # Remove duplicates
             else:
                 record.template_variables = '[]'
         _logger.info("Extracted this variables: ", self.template_variables)
 
     
-    @api.onchange('template_name', 'template_media_url')
+    @api.depends('template_name', 'template_media_url')
     def _prepare_template_components(self):
         """Prepare the components dictionary for template messages"""
-        _logger.info("Template name exists: %s", bool(self.template_name))
-        
         components = {}
         
-        if self.template_name:
+        if not self.template_name:
+            return components
+        
+        try:
+            # Get variables - ensure we have a list
+            variables = []
+            if self.template_variables:
+                if isinstance(self.template_variables, str):
+                    try:
+                        variables = json.loads(self.template_variables)
+                    except json.JSONDecodeError:
+                        variables = [self.template_variables]
+                else:
+                    variables = self.template_variables
+            
+            # Sanitize all values
+            sanitized_vars = []
+            for var in variables:
+                if var is None:
+                    sanitized_vars.append("")
+                else:
+                    sanitized = str(var)
+                    sanitized = sanitized.replace('\\', '\\\\')
+                    sanitized = sanitized.replace('"', '\\"')
+                    sanitized_vars.append(sanitized)
+            
+            # Build components based on header type
             if self.template_name.header_type in ["IMAGE", "VIDEO", "DOCUMENT"]:
-                _logger.info("Taking IMAGE/VIDEO/DOCUMENT branch")
                 components = {
                     "header": {
                         'type': self.template_name.header_type,
-                        'mediaUrl': self.template_media_url
+                        'mediaUrl': self.template_media_url or ""
                     },
                     'body': {
-                        'placeholders':["Joshua"],
+                        'placeholders': sanitized_vars
                     }  
                 }
             else:
-                _logger.info("Taking TEXT branch")
                 components = {
                     "header": {
                         'type': "TEXT",
-                        'parameter': self.template_variables
+                        'parameter': sanitized_vars
                     },
                     'body': {
-                        'placeholders': self.template_variables,
+                        'placeholders': sanitized_vars
                     }  
                 }
-        # Assign to a field if you have one
-        _logger.info("Final components: %s", components)
-        self.template_components = components
+                
+        except Exception as e:
+            _logger.error(f"Template component preparation failed: {str(e)}")
+            raise ValidationError("Failed to prepare template components. Please check your input.")
         
+        self.template_components = json.dumps(components)
         return components
     
 
     def send_template_message_v2(self, context=None):
-        """Send WhatsApp template message with session tracking"""
+        """Send WhatsApp template message with improved error handling"""
+        try:
+            config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
+            if not config:
+                raise ValidationError("No active LipaChat configuration found")
 
-         # Add debugging
-        _logger.info("Template name field: %s", self.template_name)
-        _logger.info("Template name ID: %s", self.template_name.id if self.template_name else None)
-        _logger.info("Template name exists: %s", bool(self.template_name))
-
-        config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
-        if not config:
-            raise ValidationError("No active LipaChat configuration found")
-
-        if not self.template_name or not self.template_name.id:
-            raise ValidationError("Please select template")
-    
-        if self.template_header_type != "TEXT" and not self.template_media_url:
-            raise ValidationError(f"Media URL is required for header type: {self.template_header_type}")
-    
+            if not self.template_name:
+                raise ValidationError("Please select a template")
         
-       
-        self.message_id = str(uuid.uuid4())
+            # Prepare components with proper error handling
+            components = self._prepare_template_components()
+            if isinstance(components, str):
+                try:
+                    components = json.loads(components)
+                except json.JSONDecodeError as e:
+                    raise ValidationError(f"Invalid template components format: {str(e)}")
 
-        components = self._prepare_template_components()
-        
-        template_data = {
-            'name': self.template_name.name,
-            'languageCode': self.template_name.language,
-            'components':  components
-        }
+            template_data = {
+                'name': self.template_name.name,
+                'languageCode': self.template_name.language or 'en',
+                'components': components
+            }
 
-        _logger.info("Template Data:\n%s", json.dumps(template_data, indent=2, sort_keys=True))
+            headers = {
+                'apiKey': config.api_key,
+                'Content-Type': 'application/json'
+            }
 
-        headers = {
-            'apiKey': config.api_key,
-            'Content-Type': 'application/json'
-        }
+            data = {
+                "messageId": str(uuid.uuid4()),
+                "to": "254717916656",  # Replace with actual recipient
+                "from": config.default_from_number,
+                "template": template_data
+            }
 
-        data = {
-            "messageId": self.message_id,
-            "to": "254717916656",
-            "from": config.default_from_number,
-            "template": template_data
-        }
+            response = requests.post(
+                f"{config.api_base_url}/whatsapp/template",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
 
-        _logger.info("Request Data:\n%s", json.dumps(data, indent=2, sort_keys=True))
+            response_data = response.json() if response.content else {}
 
-        response = requests.post(
-            f"{config.api_base_url}/whatsapp/template",
-            headers=headers,
-            json=data,
-            timeout=30
-        )
+            if response_data.get('status') == 'success':
+                # Create message record with proper placeholder handling
+                placeholders = []
+                if components.get('body', {}).get('placeholders'):
+                    placeholders = components['body']['placeholders']
+                
+                self.env['lipachat.message'].create({
+                    'partner_id': 3,  # Replace with actual partner
+                    'phone_number': "254717916656",
+                    'config_id': config.id,
+                    'template_name': self.template_name.id,
+                    'message_type': 'template',
+                    'message_text': f"Template: {self.template_name.name}",
+                    "media_type": self.template_name.header_type,
+                    "template_media_url": self.template_media_url,
+                    "template_placeholders": placeholders,
+                    'state': 'sent'
+                })
+                
+                self._clear_template_data()
+                return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
+                    'title': 'Success',
+                    'message': 'Template message sent successfully!',
+                    'type': 'success',
+                    'sticky': False,
+                }}
+            else:
+                error_msg = response_data.get('message', 'Unknown error')
+                raise ValidationError(f"Failed to send template: {error_msg}")
 
-        response_data = response.json() if response.content else {}
-
-        _logger.info("Response Body:\n%s", json.dumps(response_data, indent=2)) 
-        # Determine state based on response
-        if response_data.get('status') == 'success':
-            message = self.env['lipachat.message'].create({
-                'partner_id': 3,
-                'phone_number': "254717916656",
-                'config_id': config.id,
-                'message_type': 'template',
-                'message_text': '',
-                'state': 'sent'
-            })
-            _logger.info("Template message sent successfully")
-            message.send_message()
-        else:
-            message = self.env['lipachat.message'].create({
-                'partner_id': 3,
-                'phone_number': "254717916656",
-                'config_id': config.id,
-                'message_type': 'template',
-                'message_text': '',
-                'state': 'failed'
-            })
-            _logger.error("Template message failed to send: %s", response_data.get('message', 'Unknown error'))
-            message.send_message()
-
-        self._clear_template_data()
-
-        _logger.info("Response Body:\n%s", json.dumps(response.json(), indent=2) if response.content else "Empty response")
-
-
-        return response
+        except Exception as e:
+            _logger.error(f"Template sending failed: {str(e)}")
+            raise ValidationError(f"Failed to send template message: {str(e)}")
     
     def _clear_template_data(self):
         """Clear template form data after sending"""
         self.write({
             'template_name': False,
-            'template_header_text': 'TEXT',
+            'template_header_text': '',
             'template_header_type': '',
             'template_media_url': '',
             'template_variables': '',

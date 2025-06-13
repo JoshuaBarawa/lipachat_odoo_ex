@@ -109,19 +109,44 @@ class LipachatMessage(models.Model):
         # Add header if media URL is provided
         if self.template_media_url:
             components['header'] = {
-                'type': 'IMAGE',  # Could make this configurable if needed
+                'type': 'IMAGE',
                 'mediaUrl': self.template_media_url
             }
         
-        # Add body with placeholders if variables exist
-        if self.template_variables and self.template_placeholders:
+        # Handle body components
+        if self.template_variables:
             try:
-                placeholders = json.loads(self.template_placeholders)
-                components['body'] = {
-                    'placeholders': placeholders
-                }
-            except (json.JSONDecodeError, TypeError):
-                pass
+                # Get placeholders - handle both string JSON and direct values
+                placeholders = []
+                if self.template_placeholders:
+                    # First try to parse as JSON
+                    try:
+                        parsed = json.loads(self.template_placeholders)
+                        if isinstance(parsed, list):
+                            placeholders = parsed
+                        else:
+                            placeholders = [parsed]
+                    except json.JSONDecodeError:
+                        # If not valid JSON, treat as direct string value
+                        placeholders = [self.template_placeholders]
+                
+                # Convert all placeholders to strings without extra escaping
+                sanitized_placeholders = []
+                for placeholder in placeholders:
+                    if placeholder is None:
+                        sanitized_placeholders.append("")
+                    else:
+                        # Convert to string without adding extra quotes
+                        sanitized_placeholders.append(str(placeholder))
+                
+                if sanitized_placeholders:
+                    components['body'] = {
+                        'placeholders': sanitized_placeholders
+                    }
+                
+            except Exception as e:
+                _logger.error(f"Error processing template placeholders: {str(e)}")
+                raise ValidationError(_("Invalid template placeholder values. Please check your input."))
                 
         return components
 
@@ -354,8 +379,19 @@ class LipachatMessage(models.Model):
         
         return self._handle_response(response)
     
+
     def _send_template_message(self, config, headers, recipient):
-       
+        components = self._prepare_template_components()
+        
+        # Ensure components are properly formatted
+        if 'body' in components and 'placeholders' in components['body']:
+            # Verify placeholders is a list, not a JSON string
+            if isinstance(components['body']['placeholders'], str):
+                try:
+                    components['body']['placeholders'] = json.loads(components['body']['placeholders'])
+                except json.JSONDecodeError:
+                    components['body']['placeholders'] = [components['body']['placeholders']]
+        
         data = {
             "messageId": self.message_id,
             "to": recipient['phone'],
@@ -363,18 +399,22 @@ class LipachatMessage(models.Model):
             "template": {
                 "name": self.template_name.name,
                 "languageCode": "en",
-                "components": self._prepare_template_components()
+                "components": components
             }
         }
+        
+        _logger.info("Sending template with data: %s", json.dumps(data, indent=2))
         
         response = requests.post(
             f"{config.api_base_url}/whatsapp/template",
             headers=headers,
-            json=data,
+            json=data,  # Let the requests library handle JSON serialization
             timeout=30
         )
         
         return self._handle_response(response)
+    
+    
     
     def _handle_response(self, response):
         """Handle API response and update message status accordingly"""
