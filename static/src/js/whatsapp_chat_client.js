@@ -569,6 +569,61 @@
             }
         }
 
+        // async handleSendTemplate() {
+        //     if (this.isSending) return;
+        //     this.isSending = true;
+        
+        //     try {
+                
+        //         const templateField = document.querySelector('.o_field_many2one input') || 
+        //                             document.querySelector('.o_field_widget[name="template_id"] input');
+        //         const templateId = templateField && templateField.value ? templateField.value : null;
+                
+        //         // if (!this.currentSelectedPartnerId) {
+        //         //     this.showChatError('Please select a contact first');
+        //         //     return;
+        //         // }
+        
+        //         if (!templateId) {
+        //             this.showChatError('Please select a template');
+        //             return;
+        //         }
+        
+        //         // Check if we need a media URL
+        //         const mediaUrlField = document.querySelector('input[name="template_media_url"]');
+        //         let mediaUrl = null;
+                
+        //         if (mediaUrlField && mediaUrlField.style.display !== 'none') {
+        //             mediaUrl = mediaUrlField.value.trim();
+        //             if (!mediaUrl) {
+        //                 this.showChatError('Please enter a media URL for this template');
+        //                 return;
+        //             }
+        //         }
+        
+        //         this.showSendingStatus(true);
+        
+        //         const result = await this.makeRpcCall(
+        //             'whatsapp.chat',
+        //             'send_template_message',
+        //             [templateId, parseInt(this.currentSelectedPartnerId), mediaUrl]
+        //         );
+        
+        //         if (result && result.status === 'success') {
+        //             this.showChatSuccess(result.message);
+        //             await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+        //         }
+        
+        //     } catch (error) {
+        //         console.error("Error sending template message:", error);
+        //         this.showChatError(error.message || 'Failed to send template message');
+        //     } finally {
+        //         this.showSendingStatus(false);
+        //         this.isSending = false;
+        //     }
+        // }
+
+
         async handleSendTemplate() {
             if (this.isSending) return;
             this.isSending = true;
@@ -577,12 +632,17 @@
                 
                 const templateField = document.querySelector('.o_field_many2one input') || 
                                     document.querySelector('.o_field_widget[name="template_id"] input');
-                const templateId = templateField && templateField.value ? templateField.value : null;
+
+                const templateId = templateField ? templateField.value : null;
+
+
+                console.log("Hello world. Clicked send temp message button!")
+                console.log("Template ID:", templateId);
                 
-                // if (!this.currentSelectedPartnerId) {
-                //     this.showChatError('Please select a contact first');
-                //     return;
-                // }
+                if (!this.currentSelectedPartnerId) {
+                    this.showChatError('Please select a contact first');
+                    return;
+                }
         
                 if (!templateId) {
                     this.showChatError('Please select a template');
@@ -590,7 +650,7 @@
                 }
         
                 // Check if we need a media URL
-                const mediaUrlField = document.querySelector('input[name="template_media_url"]');
+                const mediaUrlField = document.querySelector('.o_field_widget[name="template_media_url"] input');
                 let mediaUrl = null;
                 
                 if (mediaUrlField && mediaUrlField.style.display !== 'none') {
@@ -605,14 +665,14 @@
         
                 const result = await this.makeRpcCall(
                     'whatsapp.chat',
-                    'send_template_message',
-                    [templateId, parseInt(this.currentSelectedPartnerId), mediaUrl]
+                    'send_template_message_v2',
+                    [ parseInt(this.currentSelectedPartnerId), parseInt(this.currentSelectedPartnerId), templateId, mediaUrl ]
                 );
         
-                if (result && result.status === 'success') {
-                    this.showChatSuccess(result.message);
-                    await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
-                }
+                // if (result && result.status === 'success') {
+                //     this.showChatSuccess(result.message);
+                //     await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+                // }
         
             } catch (error) {
                 console.error("Error sending template message:", error);
@@ -946,8 +1006,8 @@
 
 
             this.addEventListener(document, 'click', (event) => {
-                if (event.target.matches('.o_whatsapp_send_template_button') || 
-                    event.target.closest('.o_whatsapp_send_template_button')) {
+                if (event.target.matches('.o_whatsapp_send_template_button_v2') || 
+                    event.target.closest('.o_whatsapp_send_template_button_v2')) {
                     event.preventDefault();
                     event.stopPropagation();
                     this.handleSendTemplate();

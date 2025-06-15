@@ -81,7 +81,7 @@ class WhatsappChat(models.TransientModel):
 
     
     @api.depends('template_name', 'template_media_url')
-    def _prepare_template_components(self):
+    def _prepare_template_components(self, media_url):
         """Prepare the components dictionary for template messages"""
         components = {}
         
@@ -116,7 +116,7 @@ class WhatsappChat(models.TransientModel):
                 components = {
                     "header": {
                         'type': self.template_name.header_type,
-                        'mediaUrl': self.template_media_url or ""
+                        'mediaUrl': media_url or ""
                     },
                     'body': {
                         'placeholders': sanitized_vars
@@ -141,18 +141,102 @@ class WhatsappChat(models.TransientModel):
         return components
     
 
-    def send_template_message_v2(self, context=None):
+    # def send_template_message_v2(self, context=None):
+    #     """Send WhatsApp template message with improved error handling"""
+    #     try:
+    #         config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
+    #         if not config:
+    #             raise ValidationError("No active LipaChat configuration found")
+
+    #         if not self.template_name:
+    #             raise ValidationError("Please select a template")
+        
+    #         # Prepare components with proper error handling
+    #         components = self._prepare_template_components()
+    #         if isinstance(components, str):
+    #             try:
+    #                 components = json.loads(components)
+    #             except json.JSONDecodeError as e:
+    #                 raise ValidationError(f"Invalid template components format: {str(e)}")
+
+    #         template_data = {
+    #             'name': self.template_name.name,
+    #             'languageCode': self.template_name.language or 'en',
+    #             'components': components
+    #         }
+
+    #         headers = {
+    #             'apiKey': config.api_key,
+    #             'Content-Type': 'application/json'
+    #         }
+
+    #         data = {
+    #             "messageId": str(uuid.uuid4()),
+    #             "to": "254717916656",  # Replace with actual recipient
+    #             "from": config.default_from_number,
+    #             "template": template_data
+    #         }
+
+    #         response = requests.post(
+    #             f"{config.api_base_url}/whatsapp/template",
+    #             headers=headers,
+    #             json=data,
+    #             timeout=30
+    #         )
+
+    #         response_data = response.json() if response.content else {}
+
+    #         if response_data.get('status') == 'success':
+    #             # Create message record with proper placeholder handling
+    #             placeholders = []
+    #             if components.get('body', {}).get('placeholders'):
+    #                 placeholders = components['body']['placeholders']
+                
+    #             self.env['lipachat.message'].create({
+    #                 'partner_id': 3,  # Replace with actual partner
+    #                 'phone_number': "254717916656",
+    #                 'config_id': config.id,
+    #                 'template_name': self.template_name.id,
+    #                 'message_type': 'template',
+    #                 'message_text': f"Template: {self.template_name.name}",
+    #                 "media_type": self.template_name.header_type,
+    #                 "template_media_url": self.template_media_url,
+    #                 "template_placeholders": placeholders,
+    #                 'state': 'sent'
+    #             })
+                
+    #             self._clear_template_data()
+    #             return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
+    #                 'title': 'Success',
+    #                 'message': 'Template message sent successfully!',
+    #                 'type': 'success',
+    #                 'sticky': False,
+    #             }}
+    #         else:
+    #             error_msg = response_data.get('message', 'Unknown error')
+    #             raise ValidationError(f"Failed to send template: {error_msg}")
+
+    #     except Exception as e:
+    #         _logger.error(f"Template sending failed: {str(e)}")
+    #         raise ValidationError(f"Failed to send template message: {str(e)}")
+        
+    def send_template_message_v2(self, partner_id, template_id, media_url=None):
         """Send WhatsApp template message with improved error handling"""
         try:
+
             config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
             if not config:
                 raise ValidationError("No active LipaChat configuration found")
 
-            if not self.template_name:
-                raise ValidationError("Please select a template")
+            partner = self.env['res.partner'].browse(partner_id)
+            if not partner.exists():
+                raise ValidationError("Selected contact not found")
+            
+            template = self.env['lipachat.template'].search([('name', '=', template_id)], limit=1)
+            
         
             # Prepare components with proper error handling
-            components = self._prepare_template_components()
+            components = self._prepare_template_components(media_url)
             if isinstance(components, str):
                 try:
                     components = json.loads(components)
@@ -160,8 +244,8 @@ class WhatsappChat(models.TransientModel):
                     raise ValidationError(f"Invalid template components format: {str(e)}")
 
             template_data = {
-                'name': self.template_name.name,
-                'languageCode': self.template_name.language or 'en',
+                'name': template.name,
+                'languageCode': template.language or 'en',
                 'components': components
             }
 
@@ -172,10 +256,12 @@ class WhatsappChat(models.TransientModel):
 
             data = {
                 "messageId": str(uuid.uuid4()),
-                "to": "254717916656",  # Replace with actual recipient
+                "to": partner.mobile or partner.phone,
                 "from": config.default_from_number,
                 "template": template_data
             }
+
+            _logger.error(f"Template component data: "+json.dumps(data))
 
             response = requests.post(
                 f"{config.api_base_url}/whatsapp/template",
@@ -219,6 +305,8 @@ class WhatsappChat(models.TransientModel):
         except Exception as e:
             _logger.error(f"Template sending failed: {str(e)}")
             raise ValidationError(f"Failed to send template message: {str(e)}")
+        
+
     
     def _clear_template_data(self):
         """Clear template form data after sending"""
