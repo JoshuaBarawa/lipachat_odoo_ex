@@ -669,10 +669,10 @@
                     [ parseInt(this.currentSelectedPartnerId), parseInt(this.currentSelectedPartnerId), templateId, mediaUrl ]
                 );
         
-                // if (result && result.status === 'success') {
-                //     this.showChatSuccess(result.message);
-                //     await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
-                // }
+                if (result && result.status === 'success') {
+                    this.showChatSuccess(result.message);
+                    await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+                }
         
             } catch (error) {
                 console.error("Error sending template message:", error);
@@ -927,38 +927,7 @@
         }
 
 
-        // const originalPushState = history.pushState;
-        // const originalReplaceState = history.replaceState;
-    
-        // history.pushState = function(...args) {
-        //     originalPushState.apply(history, args);
-        //     console.log('PushState detected');
-        //     setTimeout(handlePageLoad, 300);
-        // };
-    
-        // history.replaceState = function(...args) {
-        //     originalReplaceState.apply(history, args);
-        //     console.log('ReplaceState detected');
-        //     setTimeout(handlePageLoad, 300);
-        // };
-    
-        // // Method 4: Periodic URL checking as fallback
-        // setInterval(() => {
-        //     if (window.location.href !== currentUrl) {
-        //         const oldUrl = currentUrl;
-        //         currentUrl = window.location.href;
-        //         console.log('Periodic check: URL changed from', oldUrl, 'to', currentUrl);
-        //         handlePageLoad();
-        //     }
-        // }, 1000);
-
-
-
-
-
-
         
-
         async _doInitialize() {
             console.log("WhatsApp Chat Client initializing...");
             
