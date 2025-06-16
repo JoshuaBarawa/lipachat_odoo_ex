@@ -10,10 +10,10 @@ class LipachatConfig(models.Model):
     _description = 'LipaChat Configuration'
     _rec_name = 'name'
 
-    name = fields.Char('Configuration Name', required=True, default='LipaChat Gateway')
+    name = fields.Char('Configuration Name', required=True, default='Lipachat Gateway')
     api_key = fields.Char('API Key', help='Get your API key from https://app.lipachat.com/auth/signup')
     api_base_url = fields.Char('API Base URL', default='https://gateway.lipachat.com/api/v1', required=True)
-    default_from_number = fields.Char('Default From Number', help='Default WhatsApp Business number (e.g., 254110090747)')
+    default_from_number = fields.Char('From Number', help='Default WhatsApp Business number (e.g., 254110090747)')
     active = fields.Boolean('Active', default=True)
     test_connection = fields.Boolean('Test Connection', compute='_compute_test_connection')
     
