@@ -67,25 +67,38 @@ class WhatsappChat(models.TransientModel):
             self.template_header_type = False
         
 
-    @api.onchange('template_name')
-    def _compute_template_variables(self):
-        _logger.info("Extracting template variables: ", self.template_name.name)
-        for record in self:
-            if record.template_name and record.template_name.body_text:
-                # Find all variables like {{1}}, {{2}}, etc.
-                variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body_text)
-                record.template_variables = list(set(variables))  # Remove duplicates
-            else:
-                record.template_variables = '[]'
+    # @api.onchange('template_name')
+    def _compute_template_variables(self, template):
+        # _logger.info("Extracting template variables: ", self.template_name.name)
+        # for record in self:
+        #     if record.template_name and record.template_name.body_text:
+        #         # Find all variables like {{1}}, {{2}}, etc.
+        #         variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body_text)
+        #         record.template_variables = list(set(variables))  # Remove duplicates
+        #     else:
+        #         record.template_variables = '[]'
+        # _logger.info("Extracted this variables: ", self.template_variables)
+
+        _logger.info("Extracting template variables: ", template.name)
+        if template and template.body_text:
+            # Find all variables like {{1}}, {{2}}, etc.
+            variables = re.findall(r'\{\{(\d+)\}\}', template.body_text)
+            self.template_variables = list(set(variables))  # Remove duplicates
+        else:
+            self.template_variables = '[]'
         _logger.info("Extracted this variables: ", self.template_variables)
 
+
+
     
-    @api.onchange('template_name', 'template_media_url')
-    def _prepare_template_components(self, media_url=None):
+    # @api.onchange('template_name', 'template_media_url')
+    def _prepare_template_components(self, template, media_url=None):
         """Prepare the components dictionary for template messages"""
         components = {}
+
+        variables = self._compute_template_variables(template)
         
-        if not self.template_name:
+        if not template:
             return components
         
         try:
@@ -112,11 +125,11 @@ class WhatsappChat(models.TransientModel):
                     sanitized_vars.append(sanitized)
             
             # Build components based on header type
-            if self.template_name.header_type in ["IMAGE", "VIDEO", "DOCUMENT"]:
+            if template.header_type in ["IMAGE", "VIDEO", "DOCUMENT"]:
                 components = {
                     "header": {
-                        'type': self.template_name.header_type,
-                        'mediaUrl': media_url or ""
+                        'type': template.header_type,
+                        'mediaUrl': media_url or self.template_media_url or ""
                     },
                     'body': {
                         'placeholders': sanitized_vars
@@ -140,6 +153,8 @@ class WhatsappChat(models.TransientModel):
         self.template_components = json.dumps(components)
         return components
     
+
+    
     def send_template_message_v2(self, partner_id, template_id, media_url=None):
         """Send WhatsApp template message with improved error handling"""
         try:
@@ -156,12 +171,16 @@ class WhatsappChat(models.TransientModel):
             
         
             # Prepare components with proper error handling
-            components = self._prepare_template_components(media_url)
-            components2 = json.loads(self.template_components)
+            # components = self._prepare_template_components(media_url)
+            # components2 = json.loads(self.template_components)
 
-            if isinstance(components, str):
+            components2 = self._prepare_template_components(template, media_url)
+
+            _logger.info(f"Template component data: "+json.dumps(components2))
+
+            if isinstance(components2, str):
                 try:
-                    components = json.loads(components)
+                    components2 = json.loads(components2)
                 except json.JSONDecodeError as e:
                     raise ValidationError(f"Invalid template components format: {str(e)}")
 
@@ -227,6 +246,81 @@ class WhatsappChat(models.TransientModel):
         except Exception as e:
             _logger.error(f"Template sending failed: {str(e)}")
             raise ValidationError(f"Failed to send template message: {str(e)}")
+        
+    
+
+    def _prepare_template_components_fresh(self, template, media_url=None):
+        """Prepare the components dictionary for template messages - FRESH each time"""
+        components = {}
+        
+        if not template:
+            return components
+        
+        try:
+            # Get variables from template body text
+            variables = []
+            if template.body_text:
+                # Find all variables like {{1}}, {{2}}, etc.
+                found_vars = re.findall(r'\{\{(\d+)\}\}', template.body_text)
+                variables = list(set(found_vars))  # Remove duplicates
+            
+            # Get placeholder values if they exist
+            placeholder_values = []
+            if hasattr(self, 'template_placeholders') and self.template_placeholders:
+                try:
+                    if isinstance(self.template_placeholders, str):
+                        placeholder_values = json.loads(self.template_placeholders)
+                    else:
+                        placeholder_values = self.template_placeholders
+                except (json.JSONDecodeError, TypeError):
+                    placeholder_values = []
+            
+            # Prepare placeholders - use provided values or empty strings
+            sanitized_vars = []
+            for i, var in enumerate(sorted(variables, key=int)):
+                if i < len(placeholder_values) and placeholder_values[i]:
+                    value = str(placeholder_values[i])
+                else:
+                    value = ""  # Default empty value
+                
+                # Sanitize the value
+                sanitized = value.replace('\\', '\\\\').replace('"', '\\"')
+                sanitized_vars.append(sanitized)
+            
+            # Build components based on header type
+            if template.header_type in ["IMAGE", "VIDEO", "DOCUMENT"]:
+                components = {
+                    "header": {
+                        'type': template.header_type,
+                        'mediaUrl': media_url or ""  # Use the passed media_url directly
+                    },
+                    'body': {
+                        'placeholders': sanitized_vars
+                    }  
+                }
+            elif template.header_type == "TEXT" and template.header_text:
+                components = {
+                    "header": {
+                        'type': "TEXT",
+                        'parameter': template.header_text
+                    },
+                    'body': {
+                        'placeholders': sanitized_vars
+                    }  
+                }
+            else:
+                # No header, just body
+                components = {
+                    'body': {
+                        'placeholders': sanitized_vars
+                    }  
+                }
+                
+        except Exception as e:
+            _logger.error(f"Template component preparation failed: {str(e)}")
+            raise ValidationError("Failed to prepare template components. Please check your input.")
+        
+        return components
     
 
     # def send_template_message_v2(self, context=None):
@@ -317,7 +411,8 @@ class WhatsappChat(models.TransientModel):
             'template_header_type': '',
             'template_media_url': '',
             'template_variables': '',
-            'template_placeholders': ''
+            'template_placeholders': '',
+            'template_components': False
         })
 
     @api.depends('session_active', 'contact_partner_id')
