@@ -93,7 +93,7 @@
                                     
 
                                      <!-- Send template message section -->
-                                     <div id="template-message-btn" class="send_temp_section">
+                                     <!-- <div id="template-message-btn" class="send_temp_section">
 
                                         <div class="template_media_inputs_sec">
                                             <field name="template_id" widget="many2one" class="template_select_dropdown"
@@ -112,7 +112,7 @@
                                         <div class="btn btn-primary o_whatsapp_send_template_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
                                              <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
                                         </div>       
-                                    </div>
+                                    </div> -->
 
 
                                     <!-- Send text message section -->
