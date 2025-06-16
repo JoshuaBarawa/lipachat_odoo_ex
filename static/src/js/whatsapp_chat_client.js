@@ -420,7 +420,7 @@
             }
             
             // Template message section (shown when session is NOT active AND contact is selected)
-            const templateSection = document.getElementById('template-message-btn');
+            const templateSection = document.querySelector('.template-message-group');
             if (templateSection) {
                 templateSection.style.display = (!isSessionActive && hasContact) ? 'block' : 'none';
             }
@@ -722,36 +722,36 @@
         }
 
 
-        hideInputsOnLoad() {
-            // Try multiple times to ensure elements exist
-            const hideInputs = () => {
-                const normalInput = document.getElementById('normal-message-input');
-                const templateSection = document.getElementById('template-message-btn');
+        // hideInputsOnLoad() {
+        //     // Try multiple times to ensure elements exist
+        //     const hideInputs = () => {
+        //         const normalInput = document.getElementById('normal-message-input');
+        //         const templateSection = document.getElementById('template-message-input');
                 
-                console.log('Attempting to hide inputs:', { normalInput: !!normalInput, templateSection: !!templateSection });
+        //         console.log('Attempting to hide inputs:', { normalInput: !!normalInput, templateSection: !!templateSection });
                 
-                if (normalInput) {
-                    normalInput.style.display = 'none';
-                    console.log('Hidden normal input');
-                }
-                if (templateSection) {
-                    templateSection.style.display = 'none';
-                    console.log('Hidden template section');
-                }
+        //         if (normalInput) {
+        //             normalInput.style.display = 'none';
+        //             console.log('Hidden normal input');
+        //         }
+        //         if (templateSection) {
+        //             templateSection.style.display = 'none';
+        //             console.log('Hidden template section');
+        //         }
                 
-                // If elements still don't exist, try again after a short delay
-                if (!normalInput || !templateSection) {
-                    setTimeout(hideInputs, 100);
-                }
-            };
+        //         // If elements still don't exist, try again after a short delay
+        //         if (!normalInput || !templateSection) {
+        //             setTimeout(hideInputs, 100);
+        //         }
+        //     };
             
-            // Try immediately
-            hideInputs();
+        //     // Try immediately
+        //     hideInputs();
             
-            // Also try after a short delay
-            setTimeout(hideInputs, 50);
-            setTimeout(hideInputs, 200);
-        }
+        //     // Also try after a short delay
+        //     setTimeout(hideInputs, 50);
+        //     setTimeout(hideInputs, 200);
+        // }
 
 
 
@@ -885,7 +885,7 @@
             // }
             
             console.log('Reinitializing for WhatsApp interface');
-            this.hideInputsOnLoad();
+            // this.hideInputsOnLoad();
             
             // Reset initialization state
             this.isInitialized = false;
@@ -944,7 +944,7 @@
                 return;
             }
         
-            this.hideInputsOnLoad();
+            // this.hideInputsOnLoad();
         
             // Start all async operations in parallel immediately
             const preloadPromise = this.preloadRecentContact();

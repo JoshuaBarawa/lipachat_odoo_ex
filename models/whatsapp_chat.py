@@ -32,7 +32,7 @@ class WhatsappChat(models.TransientModel):
     show_media_url_field = fields.Boolean(compute="_compute_show_media_url_field")
 
     session_start_time = fields.Datetime(string="Session Start Time")
-    session_duration = fields.Integer(string="Session Duration (seconds)", default=60)  # 5 minutes
+    session_duration = fields.Integer(string="Session Duration (seconds)", default=300)  # 5 minutes
     session_active = fields.Boolean(string="Session Active", default=False)
     session_remaining_time = fields.Integer(string="Session Remaining Time", compute="_compute_session_remaining")
 
@@ -225,14 +225,23 @@ class WhatsappChat(models.TransientModel):
                     "template_placeholders": placeholders,
                     'state': 'sent'
                 })
+
+                session_started = self.start_session_tracking(partner.id)
                 
                 self._clear_template_data()
-                return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
-                    'title': 'Success',
+                # return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
+                #     'title': 'Success',
+                #     'message': 'Template message sent successfully!',
+                #     'type': 'success',
+                #     'sticky': False,
+                # }}
+            
+                return {
+                    'status': 'success',
                     'message': 'Template message sent successfully!',
-                    'type': 'success',
-                    'sticky': False,
-                }}
+                    'session_started': session_started,
+                    'session_info': self.rpc_get_session_info(partner.id)
+                }
             else:
                 error_msg = response_data.get('message', 'Unknown error')
                 raise ValidationError(f"Failed to send template: {error_msg}")
@@ -337,7 +346,7 @@ class WhatsappChat(models.TransientModel):
                 'contact': self.env['res.partner'].browse(partner_id).name,
                 'session_start_time': now,
                 'session_active': True,
-                'session_duration': 60  # 5 minutes
+                'session_duration': 300  # 5 minutes
             })
             return True
         else:
@@ -345,7 +354,7 @@ class WhatsappChat(models.TransientModel):
             session.write({
                 'session_start_time': now,
                 'session_active': True,
-                'session_duration': 60
+                'session_duration': 300
             })
             return True
     
@@ -677,7 +686,7 @@ class WhatsappChat(models.TransientModel):
                 formatted_caption = escaped_caption.replace('\n', '<br>')
                 content += f": {formatted_caption}"
         elif msg_data['message_type'] == 'template':
-            content = f"📋 Template: {msg_data['template_name']}"
+            content = f"📋 Template: {msg_data['template_name'].name}"
 
         # Format date for display
         msg_date_obj = datetime.fromisoformat(msg_data['create_date']) if msg_data['create_date'] else None
