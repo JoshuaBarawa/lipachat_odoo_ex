@@ -660,13 +660,21 @@
                         return;
                     }
                 }
-        
+
+                // Get placeholder values
+                const placeholderField = document.querySelector('.o_field_widget[name="template_variable_values"] input');
+                let variableValues = [];
+                if (placeholderField && placeholderField.value.trim() !== '') {
+                    variableValues = placeholderField.value.split(',').map(item => item.trim());
+                }
+                console.log(variableValues);
+    
                 this.showSendingStatus(true);
         
                 const result = await this.makeRpcCall(
                     'whatsapp.chat',
                     'send_template_message_v2',
-                    [ parseInt(this.currentSelectedPartnerId), parseInt(this.currentSelectedPartnerId), templateId, mediaUrl ]
+                    [ parseInt(this.currentSelectedPartnerId), parseInt(this.currentSelectedPartnerId), templateId, variableValues, mediaUrl ]
                 );
         
                 if (result && result.status === 'success') {

@@ -54,6 +54,8 @@ class WhatsappChat(models.TransientModel):
     partner_id = fields.Many2one('res.partner', 'Contact')
     message_id = fields.Char('Message ID', required=True, default=lambda self: str(uuid.uuid4()))
 
+    template_variable_values = fields.Char('Variable Values')
+
 
     template_components = fields.Json('Template Components')
 
@@ -62,23 +64,19 @@ class WhatsappChat(models.TransientModel):
         """Update header type when template changes"""
         if self.template_name:
             self.template_header_type = self.template_name.header_type
+            self.template_body_text = self.template_name.body_text
+
+            self.template_variable_values = False
+            self.template_placeholders = []
+
             _logger.info("Template header type: %s", self.template_header_type)
         else:
             self.template_header_type = False
+            self.template_variable_values = False
+            self.template_placeholders = []
         
 
-    # @api.onchange('template_name')
     def _compute_template_variables(self, template):
-        # _logger.info("Extracting template variables: ", self.template_name.name)
-        # for record in self:
-        #     if record.template_name and record.template_name.body_text:
-        #         # Find all variables like {{1}}, {{2}}, etc.
-        #         variables = re.findall(r'\{\{(\d+)\}\}', record.template_name.body_text)
-        #         record.template_variables = list(set(variables))  # Remove duplicates
-        #     else:
-        #         record.template_variables = '[]'
-        # _logger.info("Extracted this variables: ", self.template_variables)
-
         _logger.info("Extracting template variables: ", template.name)
         if template and template.body_text:
             # Find all variables like {{1}}, {{2}}, etc.
@@ -88,41 +86,42 @@ class WhatsappChat(models.TransientModel):
             self.template_variables = '[]'
         _logger.info("Extracted this variables: ", self.template_variables)
 
-
-
     
     # @api.onchange('template_name', 'template_media_url')
-    def _prepare_template_components(self, template, media_url=None):
+    def _prepare_template_components(self, template, placeholders, media_url=None):
         """Prepare the components dictionary for template messages"""
         components = {}
 
-        variables = self._compute_template_variables(template)
-        
+        # varibale_values = [item.strip() for item in placeholders.split(",") if item.strip()]
+        # Prepare placeholders FIRST
+        _logger.info("Placeholders returned : %s", placeholders)
+
+
         if not template:
             return components
         
         try:
             # Get variables - ensure we have a list
-            variables = []
-            if self.template_variables:
-                if isinstance(self.template_variables, str):
-                    try:
-                        variables = json.loads(self.template_variables)
-                    except json.JSONDecodeError:
-                        variables = [self.template_variables]
-                else:
-                    variables = self.template_variables
+            # variables = []
+            # if self.template_variables:
+            #     if isinstance(self.template_variables, str):
+            #         try:
+            #             variables = json.loads(self.template_variables)
+            #         except json.JSONDecodeError:
+            #             variables = [self.template_variables]
+            #     else:
+            #         variables = self.template_variables
             
-            # Sanitize all values
-            sanitized_vars = []
-            for var in variables:
-                if var is None:
-                    sanitized_vars.append("")
-                else:
-                    sanitized = str(var)
-                    sanitized = sanitized.replace('\\', '\\\\')
-                    sanitized = sanitized.replace('"', '\\"')
-                    sanitized_vars.append(sanitized)
+            # # Sanitize all values
+            # sanitized_vars = []
+            # for var in variables:
+            #     if var is None:
+            #         sanitized_vars.append("")
+            #     else:
+            #         sanitized = str(var)
+            #         sanitized = sanitized.replace('\\', '\\\\')
+            #         sanitized = sanitized.replace('"', '\\"')
+            #         sanitized_vars.append(sanitized)
             
             # Build components based on header type
             if template.header_type in ["IMAGE", "VIDEO", "DOCUMENT"]:
@@ -132,17 +131,17 @@ class WhatsappChat(models.TransientModel):
                         'mediaUrl': media_url or self.template_media_url or ""
                     },
                     'body': {
-                        'placeholders': sanitized_vars
+                        'placeholders': placeholders
                     }  
                 }
             else:
                 components = {
                     "header": {
                         'type': "TEXT",
-                        'parameter': sanitized_vars
+                        'parameter': placeholders
                     },
                     'body': {
-                        'placeholders': sanitized_vars
+                        'placeholders': placeholders
                     }  
                 }
                 
@@ -155,7 +154,7 @@ class WhatsappChat(models.TransientModel):
     
 
     
-    def send_template_message_v2(self, partner_id, template_id, media_url=None):
+    def send_template_message_v2(self, partner_id, template_id, placeholders, media_url=None):
         """Send WhatsApp template message with improved error handling"""
         try:
 
@@ -168,14 +167,9 @@ class WhatsappChat(models.TransientModel):
                 raise ValidationError("Selected contact not found")
             
             template = self.env['lipachat.template'].search([('name', '=', template_id)], limit=1)
-            
-        
-            # Prepare components with proper error handling
-            # components = self._prepare_template_components(media_url)
-            # components2 = json.loads(self.template_components)
 
-            components2 = self._prepare_template_components(template, media_url)
 
+            components2 = self._prepare_template_components(template, placeholders, media_url)
             _logger.info(f"Template component data: "+json.dumps(components2))
 
             if isinstance(components2, str):
@@ -246,161 +240,7 @@ class WhatsappChat(models.TransientModel):
         except Exception as e:
             _logger.error(f"Template sending failed: {str(e)}")
             raise ValidationError(f"Failed to send template message: {str(e)}")
-        
-    
 
-    def _prepare_template_components_fresh(self, template, media_url=None):
-        """Prepare the components dictionary for template messages - FRESH each time"""
-        components = {}
-        
-        if not template:
-            return components
-        
-        try:
-            # Get variables from template body text
-            variables = []
-            if template.body_text:
-                # Find all variables like {{1}}, {{2}}, etc.
-                found_vars = re.findall(r'\{\{(\d+)\}\}', template.body_text)
-                variables = list(set(found_vars))  # Remove duplicates
-            
-            # Get placeholder values if they exist
-            placeholder_values = []
-            if hasattr(self, 'template_placeholders') and self.template_placeholders:
-                try:
-                    if isinstance(self.template_placeholders, str):
-                        placeholder_values = json.loads(self.template_placeholders)
-                    else:
-                        placeholder_values = self.template_placeholders
-                except (json.JSONDecodeError, TypeError):
-                    placeholder_values = []
-            
-            # Prepare placeholders - use provided values or empty strings
-            sanitized_vars = []
-            for i, var in enumerate(sorted(variables, key=int)):
-                if i < len(placeholder_values) and placeholder_values[i]:
-                    value = str(placeholder_values[i])
-                else:
-                    value = ""  # Default empty value
-                
-                # Sanitize the value
-                sanitized = value.replace('\\', '\\\\').replace('"', '\\"')
-                sanitized_vars.append(sanitized)
-            
-            # Build components based on header type
-            if template.header_type in ["IMAGE", "VIDEO", "DOCUMENT"]:
-                components = {
-                    "header": {
-                        'type': template.header_type,
-                        'mediaUrl': media_url or ""  # Use the passed media_url directly
-                    },
-                    'body': {
-                        'placeholders': sanitized_vars
-                    }  
-                }
-            elif template.header_type == "TEXT" and template.header_text:
-                components = {
-                    "header": {
-                        'type': "TEXT",
-                        'parameter': template.header_text
-                    },
-                    'body': {
-                        'placeholders': sanitized_vars
-                    }  
-                }
-            else:
-                # No header, just body
-                components = {
-                    'body': {
-                        'placeholders': sanitized_vars
-                    }  
-                }
-                
-        except Exception as e:
-            _logger.error(f"Template component preparation failed: {str(e)}")
-            raise ValidationError("Failed to prepare template components. Please check your input.")
-        
-        return components
-    
-
-    # def send_template_message_v2(self, context=None):
-    #     """Send WhatsApp template message with improved error handling"""
-    #     try:
-    #         config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
-    #         if not config:
-    #             raise ValidationError("No active LipaChat configuration found")
-
-    #         if not self.template_name:
-    #             raise ValidationError("Please select a template")
-        
-    #         # Prepare components with proper error handling
-    #         components = self._prepare_template_components()
-    #         if isinstance(components, str):
-    #             try:
-    #                 components = json.loads(components)
-    #             except json.JSONDecodeError as e:
-    #                 raise ValidationError(f"Invalid template components format: {str(e)}")
-
-    #         template_data = {
-    #             'name': self.template_name.name,
-    #             'languageCode': self.template_name.language or 'en',
-    #             'components': components
-    #         }
-
-    #         headers = {
-    #             'apiKey': config.api_key,
-    #             'Content-Type': 'application/json'
-    #         }
-
-    #         data = {
-    #             "messageId": str(uuid.uuid4()),
-    #             "to": "254717916656",  # Replace with actual recipient
-    #             "from": config.default_from_number,
-    #             "template": template_data
-    #         }
-
-    #         response = requests.post(
-    #             f"{config.api_base_url}/whatsapp/template",
-    #             headers=headers,
-    #             json=data,
-    #             timeout=30
-    #         )
-
-    #         response_data = response.json() if response.content else {}
-
-    #         if response_data.get('status') == 'success':
-    #             # Create message record with proper placeholder handling
-    #             placeholders = []
-    #             if components.get('body', {}).get('placeholders'):
-    #                 placeholders = components['body']['placeholders']
-                
-    #             self.env['lipachat.message'].create({
-    #                 'partner_id': 3,  # Replace with actual partner
-    #                 'phone_number': "254717916656",
-    #                 'config_id': config.id,
-    #                 'template_name': self.template_name.id,
-    #                 'message_type': 'template',
-    #                 'message_text': f"Template: {self.template_name.name}",
-    #                 "media_type": self.template_name.header_type,
-    #                 "template_media_url": self.template_media_url,
-    #                 "template_placeholders": placeholders,
-    #                 'state': 'sent'
-    #             })
-                
-    #             self._clear_template_data()
-    #             return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
-    #                 'title': 'Success',
-    #                 'message': 'Template message sent successfully!',
-    #                 'type': 'success',
-    #                 'sticky': False,
-    #             }}
-    #         else:
-    #             error_msg = response_data.get('message', 'Unknown error')
-    #             raise ValidationError(f"Failed to send template: {error_msg}")
-
-    #     except Exception as e:
-    #         _logger.error(f"Template sending failed: {str(e)}")
-    #         raise ValidationError(f"Failed to send template message: {str(e)}")
         
     
     def _clear_template_data(self):
@@ -411,9 +251,12 @@ class WhatsappChat(models.TransientModel):
             'template_header_type': '',
             'template_media_url': '',
             'template_variables': '',
-            'template_placeholders': '',
+            'template_placeholders': [],
+            'template_variable_values': False,
             'template_components': False
         })
+
+
 
     @api.depends('session_active', 'contact_partner_id')
     def _compute_can_send_message(self):

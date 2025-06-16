@@ -65,24 +65,15 @@
 
                                 <!-- Show header_text when header_type IS 'TEXT' -->
                                 <field name="template_header_text" invisible="template_header_type != 'TEXT'" widget="char"/>
-                                <field name="template_body_text" invisible="not template_name"/>
+                                <!-- <field name="template_body_text" invisible="not template_name"/> -->
+                                <field name="template_variable_values"  placeholder="Enter placeholder values (comma-separated, e.g., John, Monday)" 
+                                  widget="char" invisible="not template_name" on_change="1"/>
  
 
-                                <!-- 
-                                    <field name="template_placeholders" 
-                                        string="Template Variables"
-                                        widget="text" 
-                                        placeholder="Enter values for template variables as JSON (e.g., {'name': 'John', 'company': 'ABC Corp'})"
-                                        invisible="template_variables == '[]'"
-                                        /> -->
-
-                                        <!-- <button class="btn btn-primary o_whatsapp_send_template_button_v2" 
-                                             name="send_template_message_v2" string="Send Template" type="object" class="btn-primary"/> -->
-
-                                     <div class="btn btn-primary o_whatsapp_send_template_button_v2" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
-                                            <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
-                                    </div>   
-                                </group>
+                                 <div class="btn btn-primary o_whatsapp_send_template_button_v2" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
+                                    <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
+                                 </div>   
+                            </group>
 
 
 
@@ -102,8 +93,8 @@
                                                 domain="[('status', '=', 'approved')]"/>
 
                                             <div class="template-media-url-container" invisible="not show_media_url_field">
-                                                <!-- <field name="template_media_url" 
-                                                placeholder="Enter media URL (https://...)" nolabel="1"/> -->
+                                                <field name="template_media_url" 
+                                                placeholder="Enter media URL (https://...)" nolabel="1"/>
                                             </div>
                                         </div>
 
