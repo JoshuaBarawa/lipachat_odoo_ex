@@ -42,7 +42,7 @@ class WhatsappChat(models.TransientModel):
     
 
     # Template fields
-    template_name = fields.Many2one('lipachat.template', string='Template')
+    template_name = fields.Many2one('lipachat.template', nolabel="1")
     template_header_text = fields.Text()
     template_body_text = fields.Text()
     template_header_type = fields.Char('Header Type', store=False)
@@ -54,7 +54,7 @@ class WhatsappChat(models.TransientModel):
     partner_id = fields.Many2one('res.partner', 'Contact')
     message_id = fields.Char('Message ID', required=True, default=lambda self: str(uuid.uuid4()))
 
-    template_variable_values = fields.Char('Variable Values')
+    template_variable_values = fields.Char('Body Variables')
 
 
     template_components = fields.Json('Template Components')

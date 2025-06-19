@@ -57,19 +57,20 @@
                                 <div class="chat-input-container">
 
                                 
-                                    <group string="Template Message" class="template-message-group">
-                                        <field name="template_name" placeholder="Select a template..."/>
+                                    <group string="Template Message (Send Template to activate session with user)" class="template-message-group">
+                                        <field name="template_name" placeholder="Select a template" nolabel="1"/>
 
                                         <!-- Media URL field (only shown if template has media) -->
-                                        <field name="template_media_url" invisible="not template_name or template_header_type == 'TEXT'"/>
+                                        <field name="template_media_url" placeholder="Enter media url: https://" invisible="not template_name or template_header_type == 'TEXT'" nolabel="1"/>
 
                                         <!-- Show header_text when header_type IS 'TEXT' -->
-                                        <field name="template_header_text" invisible="template_header_type != 'TEXT'" widget="char"/>
-                                        <field name="template_variable_values"  placeholder="Enter placeholder values (comma-separated, e.g., John, Monday)" 
-                                        widget="char" invisible="not template_name" on_change="1"/>
+                                        <field name="template_header_text" invisible="template_header_type != 'TEXT'" widget="char" nolabel="1" placeholder="Enter header placeholder value e.g. John"/>
+
+                                        <field name="template_variable_values"  placeholder="Enter body placeholder values e.g. John, Monday" 
+                                        widget="char" invisible="not template_name" on_change="1" nolabel="1"/>
 
 
-                                        <div class="btn btn-primary o_whatsapp_send_template_button_v2" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left;">
+                                        <div class="btn btn-primary o_whatsapp_send_template_button_v2" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left; width: max-content">
                                             <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
                                         </div>   
                                     </group>
