@@ -203,18 +203,13 @@
             <field name="name">lipachat.config.form</field>
             <field name="model">lipachat.config</field>
             <field name="arch" type="xml">
-                <form string="LipaChat Configuration" class="lipachat-config-form">
+                <form string="Lipachat Configuration" class="lipachat-config-form">
                     <header>
                         <button name="test_api_connection" string="🔗 Test Connection" type="object" class="btn-primary"/>
                     </header>
                     <sheet>
-                        <!-- <div class="oe_title">
-                            <h1>
-                                <field name="name" placeholder="Configuration Name" required="1"/>
-                            </h1>
-                        </div> -->
                         <group>
-                            <group string="📡 API Configuration">
+                            <group string="📡 Configuration">
                                 <field name="name" placeholder="Configuration Name" required="1"/>
                                 <field name="default_from_number" placeholder="e.g.254110090747" required="1"/>
 

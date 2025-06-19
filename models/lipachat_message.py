@@ -1,5 +1,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+from datetime import datetime, timedelta
 import requests
 import json
 import uuid
@@ -29,7 +30,7 @@ class LipachatMessage(models.Model):
     
     config_id = fields.Many2one(
         'lipachat.config',
-        string='LipaChat Configuration',
+        string='Configuration',
         domain=[('active', '=', True)],
         required=True,
         help='Select LipaChat config to use for sending this message'
@@ -59,7 +60,7 @@ class LipachatMessage(models.Model):
         ('AUDIO', 'Audio')
     ], 'Media Type')
     media_url = fields.Char('Media URL')
-    caption = fields.Text('Caption')
+    caption = fields.Char('Caption')
     
     # Interactive fields
     header_text = fields.Char('Header Text')
@@ -70,7 +71,7 @@ class LipachatMessage(models.Model):
     # Template fields
     template_name = fields.Many2one('lipachat.template', string='Template')
     template_media_url = fields.Char('Media URL', readonly="state != 'draft'")
-    template_variables = fields.Text('Template Variables', compute='_compute_template_variables', store=False)
+    template_variables = fields.Char('Template Variables', compute='_compute_template_variables', store=False)
     template_placeholders = fields.Text('Placeholder Values', default='[]')
   
     
@@ -78,9 +79,9 @@ class LipachatMessage(models.Model):
     state = fields.Selection([
         ('draft', 'Draft'),
         ('sent', 'Sent'),
-        ('delivered', 'Delivered'),
+        # ('delivered', 'Delivered'),
         ('failed', 'Failed'),
-        ('partially_sent', 'Partially Sent')
+        # ('partially_sent', 'Partially Sent')
     ], 'Status', default='draft')
     
     error_message = fields.Text('Error Message')
@@ -218,6 +219,9 @@ class LipachatMessage(models.Model):
     def _send_bulk_messages(self, recipients, config):
         """Create individual message records for each recipient and send them"""
         # Mark current record as bulk template only if more than one recipient
+        if not config.api_key:
+            raise ValidationError(_("Please configure you API key before sending messages."))
+        
         if len(recipients) > 1:
             self.is_bulk_template = True
         else:
@@ -276,8 +280,13 @@ class LipachatMessage(models.Model):
         
         return True
 
+
+    # Then modify the _send_single_message method to include session tracking:
     def _send_single_message(self, recipient, config):
-        """Send message to a single recipient"""
+        """Send message to a single recipient and start session tracking"""
+        if not config.api_key:
+            raise ValidationError(_("Please configure you API key before sending messages."))
+
         headers = {
             'apiKey': config.api_key,
             'Content-Type': 'application/json'
@@ -288,6 +297,13 @@ class LipachatMessage(models.Model):
             if send_method(config, headers, recipient):
                 self.state = 'sent'
                 self.sent_contacts = f"{recipient['name']} ({recipient['phone']})"
+                
+                # Start session tracking after successful message send
+                if recipient.get('partner_id'):
+                    whatsapp_chat = self.env['whatsapp.chat']
+                    session_started = whatsapp_chat.start_session_tracking(recipient['partner_id'])
+                    _logger.info(f"Session tracking {'started' if session_started else 'updated'} for partner {recipient['partner_id']}")
+                
                 return True
             else:
                 self.state = 'failed'

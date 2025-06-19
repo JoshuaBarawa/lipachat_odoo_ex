@@ -7,7 +7,7 @@ _logger = logging.getLogger(__name__)
 
 class LipachatConfig(models.Model):
     _name = 'lipachat.config'
-    _description = 'LipaChat Configuration'
+    _description = 'Lipachat Configuration'
     _rec_name = 'name'
 
     name = fields.Char('Configuration Name', required=True, default='Lipachat Gateway')
@@ -21,6 +21,9 @@ class LipachatConfig(models.Model):
     def _compute_test_connection(self):
         for record in self:
             record.test_connection = bool(record.api_key and record.api_base_url)
+
+    
+    
     
     def test_api_connection(self):
         """Test API connection"""

@@ -74,7 +74,7 @@
                         </div>
 
                         <div class="recipient-selection">
-                            <h2>Recipients</h2>
+                            <!-- <h2></h2> -->
                             <group>
                                 <field name="partner_ids" widget="many2many_tags" 
                                     placeholder="Select contacts..."
@@ -93,8 +93,8 @@
                                 <field name="message_type" readonly="state != 'draft'"/>
                             </group>
                             <group>
-                                <field name="message_id"/>
-                                <field name="create_date"/>
+                                <field name="message_id" invisible="1"/>
+                                <field name="create_date" invisible="1"/>
                                 <field name="is_bulk_template" invisible="1"/>
                                 <!-- Hidden fields for internal use -->
                                 <field name="partner_id" invisible="1"/>
@@ -133,26 +133,10 @@
 
                                     <field name="template_placeholders" 
                                         string="Template Variables"
-                                        widget="text" 
+                                        widget="char" 
                                         placeholder="Enter values for template variables as JSON (e.g., {'name': 'John', 'company': 'ABC Corp'})"
                                         invisible="template_variables == '[]'"
                                         readonly="state != 'draft'"/>
-
-                                    <!-- <div class="o_row" invisible="template_variables == '[]'">
-                                        <span string="Template Variables" class="o_form_label" style="font-weight: bold;"/>
-                                        <div>
-                                            <t t-foreach="json.loads(template_variables or '[]')" t-as="var">
-                                                <div class="o_row">
-                                                    <span t-esc="'{{%s}}'" class="o_form_label"/>
-                                                    <field name="template_placeholders" 
-                                                        widget="template_variable_input" 
-                                                        t-att-data-index="var"
-                                                        t-att-placeholder="'Value for {{%s}}' % var"
-                                                        class="o_template_variable_input"/>
-                                                </div>
-                                            </t>
-                                        </div>
-                                    </div> -->
 
                                 </group>
 
@@ -160,10 +144,10 @@
 
                             <page string="Response Details">
                                 <group>
-                                    <field name="error_message"/>
+                                    <!-- <field name="error_message"/> -->
                                     <field name="sent_contacts" readonly="1"/>
                                     <field name="failed_contacts" readonly="1"/>
-                                    <field name="response_data" widget="ace" options="{'mode': 'json'}" readonly="1"/>
+                                    <!-- <field name="response_data" widget="ace" options="{'mode': 'json'}" readonly="1"/> -->
                                 </group>
                             </page>
                         </notebook>

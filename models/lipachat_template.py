@@ -16,7 +16,8 @@ class LipachatTemplate(models.Model):
 
     name = fields.Char('Template Name', required=True)
     language = fields.Selection(
-        selection=[('en', 'English')],
+        selection=[('en', 'English'),
+                   ('en_US', 'English')],
         string='Language',
         default='en',
         required=True,
@@ -145,6 +146,9 @@ class LipachatTemplate(models.Model):
             raise ValidationError(_("Failed to fetch templates: %s") % str(e))
 
         templates = data.get("data", {}).get("data", [])
+
+        _logger.info(templates)
+
         for tpl in templates:
             vals = {
                 "name": tpl.get("name"),
