@@ -1,6 +1,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 from datetime import datetime, timedelta
+from odoo.exceptions import UserError
 import requests
 import json
 import uuid
@@ -23,6 +24,7 @@ class LipachatMessage(models.Model):
         help='Select multiple contacts to send this message to'
     )
     phone_number = fields.Char('Phone Number')
+    fail_reason = fields.Text('Fail Reason', readonly=True)
     
     # Add field to track if this is a bulk message template
     is_bulk_template = fields.Boolean('Is Bulk Template', default=False)
@@ -281,11 +283,10 @@ class LipachatMessage(models.Model):
         return True
 
 
-    # Then modify the _send_single_message method to include session tracking:
     def _send_single_message(self, recipient, config):
-        """Send message to a single recipient and start session tracking"""
+        """Send message to a single recipient with session validation"""
         if not config.api_key:
-            raise ValidationError(_("Please configure you API key before sending messages."))
+            raise ValidationError(_("Please configure your API key before sending messages."))
 
         headers = {
             'apiKey': config.api_key,
@@ -293,28 +294,61 @@ class LipachatMessage(models.Model):
         }
         
         try:
+            partner_id = recipient.get('partner_id')
+            session_active = False
+            
+            # Check session status if we have a partner_id
+            if partner_id:
+                whatsapp_chat = self.env['whatsapp.chat']
+                session_info = whatsapp_chat.rpc_get_session_info(partner_id)
+                session_active = session_info.get('active', False)
+                
+                # Block non-template messages if no active session
+                if not session_active and self.message_type != 'template':
+                    fail_reason = _(
+                        "No active session. Send a template message first to start a session."
+                    )
+                    self.write({
+                        'state': 'failed',
+                        'error_message': fail_reason,
+                        'fail_reason': fail_reason
+                    })
+                    return False
+            
+            # Send the message
             send_method = getattr(self, f'_send_{self.message_type}_message')
             if send_method(config, headers, recipient):
                 self.state = 'sent'
                 self.sent_contacts = f"{recipient['name']} ({recipient['phone']})"
                 
-                # Start session tracking after successful message send
-                if recipient.get('partner_id'):
-                    whatsapp_chat = self.env['whatsapp.chat']
-                    session_started = whatsapp_chat.start_session_tracking(recipient['partner_id'])
-                    _logger.info(f"Session tracking {'started' if session_started else 'updated'} for partner {recipient['partner_id']}")
+                # Start new session only if:
+                # 1. We have a partner_id
+                # 2. It's a template message
+                # 3. No active session exists
+                if partner_id and self.message_type == 'template' and not session_active:
+                    session_started = whatsapp_chat.start_session_tracking(partner_id)
+                    _logger.info(f"New session started for partner {partner_id}")
+                elif session_active:
+                    _logger.info(f"Using existing active session for partner {partner_id}")
                 
                 return True
             else:
-                self.state = 'failed'
-                self.error_message = "Unexpected API response status"
-                self.failed_contacts = f"{recipient['name']} ({recipient['phone']}): Unexpected status"
+                fail_reason = "Unexpected API response status"
+                self.write({
+                    'state': 'failed',
+                    'error_message': fail_reason,
+                    'fail_reason': fail_reason
+                })
                 return False
+                
         except Exception as e:
-            _logger.error(f"Failed to send to {recipient['phone']}: {str(e)}")
-            self.state = 'failed'
-            self.error_message = str(e)
-            self.failed_contacts = f"{recipient['name']} ({recipient['phone']}): {str(e)}"
+            fail_reason = str(e)
+            _logger.error(f"Failed to send to {recipient['phone']}: {fail_reason}")
+            self.write({
+                'state': 'failed',
+                'error_message': fail_reason,
+                'fail_reason': fail_reason
+            })
             return False
     
     def _send_text_message(self, config, headers, recipient):

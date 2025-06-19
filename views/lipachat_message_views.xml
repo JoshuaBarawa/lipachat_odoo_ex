@@ -145,6 +145,7 @@
                             <page string="Response Details">
                                 <group>
                                     <!-- <field name="error_message"/> -->
+                                    <field name="fail_reason"/>
                                     <field name="sent_contacts" readonly="1"/>
                                     <field name="failed_contacts" readonly="1"/>
                                     <!-- <field name="response_data" widget="ace" options="{'mode': 'json'}" readonly="1"/> -->
@@ -171,6 +172,7 @@
                     <field name="message_type" string="Message Type"/>
                     <field name="message_text_short" string="Content"/>
                     <field name="state" string="Status"/>
+                    <!-- <field name="fail_reason" string="Fail Reason"/> -->
                     <!-- <field name="bulk_parent_id" invisible="1"/>
                     <field name="is_bulk_template" invisible="1"/> -->
                 </tree>
