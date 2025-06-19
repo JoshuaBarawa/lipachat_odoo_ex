@@ -54,17 +54,19 @@
             const url = window.location.href;
             const pathname = window.location.pathname;
             const search = window.location.search;
+            const hash = window.location.hash;
             
             log('Current URL:', url);
             log('Pathname:', pathname);
             log('Search params:', search);
+            log('Hash:', hash);
             
-            // Check URL patterns
+            // Check URL patterns - updated to match your specific URL structure
             const urlChecks = [
                 url.toLowerCase().includes('model=lipachat.template'),
                 url.toLowerCase().includes('lipachat.template'),
-                pathname.includes('/web'),
-                search.includes('lipachat')
+                hash.toLowerCase().includes('model=lipachat.template'),
+                // pathname.includes('/web')
             ];
             
             log('URL checks:', urlChecks);
@@ -74,8 +76,8 @@
             const viewTitle = document.querySelector('.o_control_panel .o_breadcrumb_item.active');
             const bodyClasses = document.body.className;
             
-            log('Breadcrumb text:', breadcrumb?.textContent);
-            log('View title text:', viewTitle?.textContent);
+            // log('Breadcrumb text:', breadcrumb?.textContent);
+            // log('View title text:', viewTitle?.textContent);
             log('Body classes:', bodyClasses);
             
             // More flexible detection
@@ -92,7 +94,124 @@
         }
     }
     
+    // Global variables for URL monitoring
+    let currentUrl = window.location.href;
+    let urlCheckInterval = null;
+    let mutationObserver = null;
     
+    // Enhanced URL monitoring with multiple detection methods (copied from WhatsApp chat)
+    function setupUrlMonitoring() {
+        // Store original URL
+        currentUrl = window.location.href;
+        
+        // Method 1a: Override history methods
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+        
+        history.pushState = (...args) => {
+            originalPushState.apply(history, args);
+            log('PushState detected');
+            setTimeout(() => handleUrlChange(), 100);
+        };
+        
+        history.replaceState = (...args) => {
+            originalReplaceState.apply(history, args);
+            log('ReplaceState detected');
+            setTimeout(() => handleUrlChange(), 100);
+        };
+        
+        // Method 1b: Listen for popstate (back/forward buttons)
+        window.addEventListener('popstate', () => {
+            log('Popstate detected');
+            setTimeout(() => handleUrlChange(), 100);
+        });
+        
+        // Method 1c: Periodic URL checking as fallback
+        urlCheckInterval = setInterval(() => {
+            if (window.location.href !== currentUrl) {
+                const oldUrl = currentUrl;
+                currentUrl = window.location.href;
+                log('Periodic check: URL changed from', oldUrl, 'to', currentUrl);
+                handleUrlChange();
+            }
+        }, 1000);
+        
+        // Method 1d: DOM mutation observer for dynamic content changes
+        mutationObserver = new MutationObserver((mutations) => {
+            // Check if breadcrumbs or other navigation elements changed
+            const hasNavigationChange = mutations.some(mutation => {
+                return Array.from(mutation.addedNodes).some(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        return node.querySelector && (
+                            node.querySelector('.breadcrumb') ||
+                            node.querySelector('.o_action_manager') ||
+                            node.classList.contains('o_action_manager')
+                        );
+                    }
+                    return false;
+                });
+            });
+            
+            if (hasNavigationChange) {
+                log('DOM navigation change detected');
+                setTimeout(() => handleUrlChange(), 200);
+            }
+        });
+        
+        mutationObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+    
+    // Handle URL changes and manage session
+    function handleUrlChange() {
+        log('Handling URL change:', window.location.href);
+        
+        const isCurrentlyOnTemplatePage = isTemplateListView();
+        const wasOnTemplatePage = sessionStorage.getItem('lipachat_was_on_template_page') === 'true';
+        
+        log('Navigation check - Currently on template page:', isCurrentlyOnTemplatePage, 'Was on template page:', wasOnTemplatePage);
+        
+        if (isCurrentlyOnTemplatePage) {
+            // Mark that we're currently on template page
+            sessionStorage.setItem('lipachat_was_on_template_page', 'true');
+            log('Marked as being on template page');
+            
+            // Initialize if needed
+            setTimeout(() => {
+                handleAutoFetch();
+            }, 1000);
+            
+        } else if (wasOnTemplatePage) {
+            // We were on template page but now we're not - clear the fetch flag
+            clearSessionForNavigation();
+            
+            // Mark that we're no longer on template page
+            sessionStorage.setItem('lipachat_was_on_template_page', 'false');
+            log('Navigation away from template page detected - session cleared');
+        }
+    }
+    
+    // Clear session when navigating away from template page
+    function clearSessionForNavigation() {
+        try {
+            const allKeys = Object.keys(sessionStorage);
+            
+            // Clear all lipachat fetch flags
+            allKeys.forEach(key => {
+                if (key.startsWith('lipachat_fetched_')) {
+                    sessionStorage.removeItem(key);
+                    log('Cleared session key:', key);
+                }
+            });
+            
+            log('Session storage cleared due to navigation away from template page');
+            
+        } catch (error) {
+            log('Error clearing session storage', error);
+        }
+    }
     
     // Show loading overlay
     function showLoading() {
@@ -192,40 +311,7 @@
             log('Error showing notification', error);
         }
     }
-    
-    // Handle manual fetch button click
-    async function handleManualFetch() {
-        try {
-            const btn = document.getElementById('fetch-templates-btn');
-            if (!btn) return;
-            
-            log('Manual fetch initiated');
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Fetching...';
-            
-            showLoading();
-            
-            try {
-                await fetchTemplates();
-                // Wait a bit for the backend to process
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                await refreshListView();
-                showNotification('Templates fetched successfully!', 'success');
-            } catch (error) {
-                log('Manual fetch failed', error);
-                showNotification(`Fetch failed: ${error.message}`, 'danger');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa fa-refresh"></i> Fetch Templates';
-                removeLoading();
-            }
-            
-        } catch (error) {
-            log('Error in manual fetch handler', error);
-            removeLoading();
-        }
-    }
+
     
     // Core function to fetch templates
     async function fetchTemplates() {
@@ -261,9 +347,19 @@
     // Handle automatic fetch on page load
     async function handleAutoFetch() {
         try {
-            // Check if we've already auto-fetched for this session
-            const sessionKey = `lipachat_fetched_${window.location.pathname}${window.location.search}`;
-            if (sessionStorage.getItem(sessionKey)) {
+            // Only proceed if we're on the template page
+            if (!isTemplateListView()) {
+                log('Not on template page - skipping auto-fetch');
+                return;
+            }
+            
+            // Create a more specific session key based on the template page
+            const sessionKey = `lipachat_fetched_${window.location.pathname}${window.location.hash}`;
+            const alreadyFetched = sessionStorage.getItem(sessionKey);
+            
+            log('Checking auto-fetch status. Already fetched:', alreadyFetched);
+            
+            if (alreadyFetched) {
                 log('Auto-fetch already completed for this session');
                 return;
             }
@@ -279,6 +375,7 @@
                 
                 // Mark as fetched for this session
                 sessionStorage.setItem(sessionKey, 'true');
+                log('Marked templates as fetched in session');
                 
                 // Wait a bit for backend processing
                 await new Promise(resolve => setTimeout(resolve, 3000));
@@ -305,6 +402,9 @@
             log('Initializing Lipachat Template Manager');
             log('Document ready state:', document.readyState);
             log('Page URL:', window.location.href);
+            
+            // Set up URL monitoring first
+            setupUrlMonitoring();
             
             if (isTemplateListView()) {
                 log('Template list view detected, starting auto-fetch');
@@ -333,12 +433,8 @@
             
             try {
                 initialize();
-                
-                // If we successfully added the button, we're good
-                if (document.getElementById('fetch-templates-btn')) {
-                    log('Initialization successful');
-                    return;
-                }
+                log('Initialization completed');
+                return;
             } catch (error) {
                 log('Initialization attempt failed', error);
             }
@@ -354,6 +450,19 @@
         tryInit();
     }
     
+    // Cleanup function
+    function cleanup() {
+        if (urlCheckInterval) {
+            clearInterval(urlCheckInterval);
+            urlCheckInterval = null;
+        }
+        
+        if (mutationObserver) {
+            mutationObserver.disconnect();
+            mutationObserver = null;
+        }
+    }
+    
     // Start initialization
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeWithRetry);
@@ -361,15 +470,7 @@
         initializeWithRetry();
     }
     
-    // Also try to initialize on hash change and popstate (for SPA navigation)
-    window.addEventListener('hashchange', () => {
-        log('Hash change detected, re-initializing');
-        setTimeout(initializeWithRetry, 500);
-    });
-    
-    window.addEventListener('popstate', () => {
-        log('Popstate detected, re-initializing');
-        setTimeout(initializeWithRetry, 500);
-    });
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', cleanup);
     
 })();
