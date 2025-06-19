@@ -155,9 +155,8 @@ class WhatsappChat(models.TransientModel):
 
     
     def send_template_message_v2(self, partner_id, template_id, placeholders, media_url=None):
-        """Send WhatsApp template message with improved error handling"""
+        """Send WhatsApp template message with improved error handling and session checks"""
         try:
-
             config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
             if not config:
                 raise ValidationError("No active LipaChat configuration found")
@@ -167,8 +166,13 @@ class WhatsappChat(models.TransientModel):
                 raise ValidationError("Selected contact not found")
             
             template = self.env['lipachat.template'].search([('name', '=', template_id)], limit=1)
+            if not template.exists():
+                raise ValidationError("Selected template not found")
 
-
+            # Check if session already exists
+            session_info = self.rpc_get_session_info(partner_id)
+            session_active = session_info.get('active', False)
+            
             components2 = self._prepare_template_components(template, placeholders, media_url)
             _logger.info(f"Template component data: "+json.dumps(components2))
 
@@ -214,7 +218,7 @@ class WhatsappChat(models.TransientModel):
                     placeholders = components2['body']['placeholders']
                 
                 self.env['lipachat.message'].create({
-                    'partner_id': partner_id,  # Replace with actual partner
+                    'partner_id': partner_id,
                     'phone_number': partner.mobile or partner.phone,
                     'config_id': config.id,
                     'template_name': template.id,
@@ -226,16 +230,16 @@ class WhatsappChat(models.TransientModel):
                     'state': 'sent'
                 })
 
-                session_started = self.start_session_tracking(partner.id)
+                # Only start new session if one doesn't already exist
+                session_started = False
+                if not session_active:
+                    session_started = self.start_session_tracking(partner.id)
+                    _logger.info(f"New session started for partner {partner.id}")
+                else:
+                    _logger.info(f"Using existing session for partner {partner.id}")
                 
                 self._clear_template_data()
-                # return {'type': 'ir.actions.client', 'tag': 'display_notification', 'params': {
-                #     'title': 'Success',
-                #     'message': 'Template message sent successfully!',
-                #     'type': 'success',
-                #     'sticky': False,
-                # }}
-            
+                
                 return {
                     'status': 'success',
                     'message': 'Template message sent successfully!',
@@ -333,30 +337,35 @@ class WhatsappChat(models.TransientModel):
 
     def start_session_tracking(self, partner_id):
         """Start or extend session tracking for a contact"""
-        # Find existing session or create new one
-        session = self.search([
+        # Check if session already exists and is active
+        existing_session = self.search([
             ('contact_partner_id', '=', partner_id),
-            ('create_uid', '=', self.env.uid)
+            ('create_uid', '=', self.env.uid),
+            ('session_active', '=', True)
         ], limit=1)
         
         now = fields.Datetime.now()
-        if not session:
-            session = self.create({
+        
+        if existing_session:
+            # Extend existing session
+            existing_session.write({
+                'session_start_time': now,
+                'session_active': True,
+                'session_duration': 300  # 5 minutes
+            })
+            _logger.info(f"Extended existing session for partner {partner_id}")
+            return False  # Didn't start new session, just extended
+        else:
+            # Create new session
+            self.create({
                 'contact_partner_id': partner_id,
                 'contact': self.env['res.partner'].browse(partner_id).name,
                 'session_start_time': now,
                 'session_active': True,
                 'session_duration': 300  # 5 minutes
             })
-            return True
-        else:
-            # Extend existing session
-            session.write({
-                'session_start_time': now,
-                'session_active': True,
-                'session_duration': 300
-            })
-            return True
+            _logger.info(f"Started new session for partner {partner_id}")
+            return True  # New session started
     
 
 
@@ -795,7 +804,7 @@ class WhatsappChat(models.TransientModel):
 
     @api.model
     def rpc_send_message(self, partner_id, message_text):
-        """Dedicated RPC method for sending messages with session tracking"""
+        """Dedicated RPC method for sending messages with session validation"""
         if not partner_id:
             raise UserError("Please select a contact first")
         
@@ -811,6 +820,13 @@ class WhatsappChat(models.TransientModel):
             raise UserError("No active LipaChat configuration found")
         
         try:
+            # Check session status first
+            session_info = self.rpc_get_session_info(partner_id)
+            if not session_info.get('active'):
+                raise UserError(
+                    "No active session. Please send a template message first to start a session."
+                )
+            
             message = self.env['lipachat.message'].create({
                 'partner_id': partner.id,
                 'phone_number': partner.mobile or partner.phone,
@@ -822,14 +838,14 @@ class WhatsappChat(models.TransientModel):
             
             message.send_message()
             
-            # Start or extend session
-            session_started = self.start_session_tracking(partner.id)
+            # Don't start new session - just use existing one
+            _logger.info(f"Using existing session for partner {partner.id}")
             
             return {
                 'status': 'success',
                 'message': f'Message sent to {partner.name}',
-                'session_started': session_started,
-                'session_info': self.rpc_get_session_info(partner.id)
+                'session_started': False,  # No new session started
+                'session_info': session_info  # Return current session info
             }
         except Exception as e:
             _logger.error(f"Failed to send message: {str(e)}")

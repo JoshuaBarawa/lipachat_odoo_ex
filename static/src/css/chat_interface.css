@@ -213,7 +213,9 @@
     padding: 10px 15px;
     border-top: 1px solid #e9ecef;
     align-items: center;
-    height: 100%;
+    height: 95%;
+    max-height: 95%;
+    overflow-y: scroll;
 }
 
 #chat-header-contact-name {
