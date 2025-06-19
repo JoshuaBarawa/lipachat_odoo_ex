@@ -699,7 +699,10 @@ class WhatsappChat(models.TransientModel):
 
         # Format date for display
         msg_date_obj = datetime.fromisoformat(msg_data['create_date']) if msg_data['create_date'] else None
-        msg_date_display = msg_date_obj.strftime('%m/%d/%Y %H:%M') if msg_date_obj else ''
+        if msg_date_obj: 
+            eat_date = msg_date_obj + timedelta(hours=3)
+            msg_date_display = eat_date.strftime('%m/%d/%Y %H:%M') 
+        # msg_date_display = msg_date_obj.strftime('%m/%d/%Y %H:%M') if msg_date_obj else ''
         
         return f'''
         <div class="message-bubble" 
@@ -936,6 +939,12 @@ class WhatsappChat(models.TransientModel):
             # It will be applied by JS based on `data-partner-id`.
             
             for partner_id, contact_info in sorted_contacts:
+                if contact_info['latest_date'] and contact_info['latest_date'] != datetime.min:
+                    eat_date = contact_info['latest_date'] + timedelta(hours=3)
+                    date_display = eat_date.strftime('%m/%d %H:%M')
+                else:
+                    date_display = ''
+           
                 html += f'''
                 <div class="contact-item" data-partner-id="{partner_id}" data-contact-name="{contact_info['name']}" 
                      style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; border-radius: 5px; margin-bottom: 5px;"
@@ -950,7 +959,7 @@ class WhatsappChat(models.TransientModel):
                             <small style="color: #888; font-style: italic;">{contact_info['latest_message']}</small>
                         </div>
                         <div style="text-align: right;">
-                            <small style="color: #999;">{contact_info['latest_date'].strftime('%m/%d %H:%M') if contact_info['latest_date'] and contact_info['latest_date'] != datetime.min else ''}</small>
+                            <small style="color: #999;">{date_display}</small>
                             <br>
                             <span style="background: #25D366; color: white; border-radius: 10px; padding: 2px 6px; font-size: 11px;">
                                 {contact_info['message_count']} msg{'s' if contact_info['message_count'] != 1 else ''}
