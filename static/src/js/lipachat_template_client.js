@@ -1,359 +1,375 @@
 (function() {
     'use strict';
-
-    // Utility: CSRF token getter (compatible with Odoo 17)
+    // Debug flag - set to true to see detailed logs
+    const DEBUG = true;
+    function log(...args) {
+        if (DEBUG) console.log('[Lipachat]', ...args);
+    }
+    
+    // Get CSRF token
     function getCSRFToken() {
-        return (
-            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
-            document.querySelector('input[name="csrf_token"]')?.value ||
-            window.odoo?.csrf_token
-        );
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+               window.odoo?.csrf_token;
     }
-
-    // Utility: Odoo RPC call
+    
+    // Make RPC call to Odoo
     async function makeRpcCall(model, method, args = [], kwargs = {}) {
-        const params = {
-            jsonrpc: "2.0",
-            method: "call",
-            params: { model, method, args, kwargs },
-            id: Math.floor(Math.random() * 1000000)
-        };
-        const response = await fetch('/web/dataset/call_kw', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken(),
-            },
-            body: JSON.stringify(params)
-        });
-        const data = await response.json();
-        if (data.error) throw new Error(data.error.data?.message || data.error.message || 'RPC Error');
-        return data.result;
+        try {
+            const params = {
+                jsonrpc: "2.0",
+                method: "call",
+                params: { model, method, args, kwargs },
+                id: Math.floor(Math.random() * 1000000)
+            };
+            
+            log(`Making RPC call to ${model}.${method}`, params);
+            
+            const response = await fetch('/web/dataset/call_kw', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken(),
+                },
+                body: JSON.stringify(params)
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error.data?.message || data.error.message);
+            }
+            
+            log('RPC call successful', data.result);
+            return data.result;
+            
+        } catch (error) {
+            log('RPC call failed', error);
+            throw error;
+        }
     }
-
-    // Detect if we're on the lipachat.template list view
-    function isLipachatTemplateListView() {
-        // Check URL for lipachat.template
-        const url = window.location.href;
-        if (url.includes('model=lipachat.template') || url.includes('lipachat.template')) {
-            return true;
+    
+    // Enhanced page detection with more debug info
+    function isTemplateListView() {
+        try {
+            const url = window.location.href;
+            const pathname = window.location.pathname;
+            const search = window.location.search;
+            
+            log('Current URL:', url);
+            log('Pathname:', pathname);
+            log('Search params:', search);
+            
+            // Check URL patterns
+            const urlChecks = [
+                url.toLowerCase().includes('model=lipachat.template'),
+                url.toLowerCase().includes('lipachat.template'),
+                pathname.includes('/web'),
+                search.includes('lipachat')
+            ];
+            
+            log('URL checks:', urlChecks);
+            
+            // Check DOM elements
+            const breadcrumb = document.querySelector('.breadcrumb');
+            const viewTitle = document.querySelector('.o_control_panel .o_breadcrumb_item.active');
+            const bodyClasses = document.body.className;
+            
+            log('Breadcrumb text:', breadcrumb?.textContent);
+            log('View title text:', viewTitle?.textContent);
+            log('Body classes:', bodyClasses);
+            
+            // More flexible detection
+            const isTemplate = urlChecks.some(check => check) || 
+                              (breadcrumb && breadcrumb.textContent.toLowerCase().includes('template')) ||
+                              (viewTitle && viewTitle.textContent.toLowerCase().includes('template'));
+            
+            log('Is template view:', isTemplate);
+            return isTemplate;
+            
+        } catch (error) {
+            log('Error checking template list view', error);
+            return false;
         }
-        
-        // Check breadcrumbs or page title
-        const breadcrumbs = document.querySelector('.breadcrumb');
-        if (breadcrumbs && breadcrumbs.textContent.includes('WhatsApp Templates')) {
-            return true;
-        }
-        
-        // Check for specific elements in the view
-        const viewTitle = document.querySelector('.o_control_panel .o_breadcrumb_item.active');
-        if (viewTitle && viewTitle.textContent.includes('WhatsApp Templates')) {
-            return true;
-        }
-        
-        return false;
     }
-
-    // Add the fetch button above the list view
-    function addFetchButton() {
-        if (document.getElementById('fetch-templates-btn')) return;
-        
-        const controlPanel = document.querySelector('.o_control_panel');
-        const listView = document.querySelector('.o_list_view');
-        
-        if (!controlPanel && !listView) return;
-
-        const btnContainer = document.createElement('div');
-        btnContainer.style.padding = '10px';
-        btnContainer.style.borderBottom = '1px solid #dee2e6';
-        
-        const btn = document.createElement('button');
-        btn.id = 'fetch-templates-btn';
-        btn.className = 'btn btn-primary';
-        btn.innerHTML = '<i class="fa fa-refresh"></i> Fetch Templates';
-
-        btn.onclick = async function() {
+    
+    
+    
+    // Show loading overlay
+    function showLoading() {
+        try {
+            removeLoading();
+            
+            log('Showing loading overlay');
+            
+            const overlay = document.createElement('div');
+            overlay.id = 'lipachat-loading-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(255,255,255,0.9);
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            `;
+            
+            const spinner = document.createElement('div');
+            spinner.style.cssText = `
+                text-align: center;
+                padding: 20px;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            `;
+            spinner.innerHTML = `
+                <i class="fa fa-spinner fa-spin fa-3x" style="color: #007bff;"></i>
+                <p style="margin: 5px 0; font-size: 1.0em; color: #666;">Please wait while we fetch your templates</p>
+            `;
+            
+            overlay.appendChild(spinner);
+            document.body.appendChild(overlay);
+            
+        } catch (error) {
+            log('Error showing loading overlay', error);
+        }
+    }
+    
+    // Remove loading overlay
+    function removeLoading() {
+        try {
+            const overlay = document.getElementById('lipachat-loading-overlay');
+            if (overlay) {
+                log('Removing loading overlay');
+                overlay.remove();
+            }
+        } catch (error) {
+            log('Error removing loading overlay', error);
+        }
+    }
+    
+    // Show notification message
+    function showNotification(message, type = 'info', timeout = 5000) {
+        try {
+            // Remove existing notifications first
+            const existing = document.querySelectorAll('.lipachat-notification');
+            existing.forEach(el => el.remove());
+            
+            log(`Showing notification: ${message}`);
+            
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible lipachat-notification`;
+            notification.style.cssText = `
+                margin: 10px;
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 400px;
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            `;
+            
+            notification.innerHTML = `
+                <button type="button" class="close" onclick="this.parentElement.remove()" style="position: absolute; right: 10px; top: 10px; background: none; border: none; font-size: 20px; cursor: pointer;">&times;</button>
+                <div style="padding-right: 30px;">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-dismiss after timeout
+            if (timeout > 0) {
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, timeout);
+            }
+            
+        } catch (error) {
+            log('Error showing notification', error);
+        }
+    }
+    
+    // Handle manual fetch button click
+    async function handleManualFetch() {
+        try {
+            const btn = document.getElementById('fetch-templates-btn');
+            if (!btn) return;
+            
+            log('Manual fetch initiated');
+            
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Fetching...';
+            
+            showLoading();
+            
             try {
-                await makeRpcCall('lipachat.template', 'action_fetch_templates', [], {});
-
-                // Refresh the list view data
-                if (window.odoo && window.odoo.define) {
-                    // Try to reload the view
-                    window.location.reload();
-                } else {
-                    window.location.reload();
-                }
-            } catch (e) {
-                console.error('Fetch failed:', e);
-                alert('Fetch failed: ' + e.message);
+                await fetchTemplates();
+                // Wait a bit for the backend to process
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                await refreshListView();
+                showNotification('Templates fetched successfully!', 'success');
+            } catch (error) {
+                log('Manual fetch failed', error);
+                showNotification(`Fetch failed: ${error.message}`, 'danger');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa fa-refresh"></i> Fetch Templates';
+                removeLoading();
             }
-        };
-
-        btnContainer.appendChild(btn);
-        
-        // Insert button in the best location
-        if (controlPanel) {
-            controlPanel.insertAdjacentElement('afterend', btnContainer);
-        } else if (listView) {
-            listView.insertAdjacentElement('beforebegin', btnContainer);
+            
+        } catch (error) {
+            log('Error in manual fetch handler', error);
+            removeLoading();
         }
     }
-
-    // Show loading state during auto-fetch
-    function showLoadingState() {
-        const loadingDiv = document.createElement('div');
-        loadingDiv.id = 'lipachat-auto-fetch-loading';
-        loadingDiv.className = 'alert alert-info';
-        loadingDiv.style.margin = '10px';
-        loadingDiv.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Loading WhatsApp templates...';
-        
-        const target = document.querySelector('.o_control_panel') || document.querySelector('.o_list_view');
-        if (target) {
-            target.insertAdjacentElement('afterend', loadingDiv);
-        }
-    }
-
-    // Remove loading state
-    function removeLoadingState() {
-        const loadingDiv = document.getElementById('lipachat-auto-fetch-loading');
-        if (loadingDiv) {
-            loadingDiv.remove();
-        }
-    }
-
-    // Track fetched pages to avoid duplicate fetches during the same visit
-    let fetchedPages = new Set();
-    let isCurrentlyFetching = false;
-
-    // Auto-fetch on page load - fetch once per visit without reload
-    async function autoFetchOnLoad() {
-        const currentUrl = window.location.href;
-        
-        // Check if we're already fetching
-        if (isCurrentlyFetching) {
-            console.log('Auto-fetch already in progress, skipping...');
-            return;
-        }
-        
-        // Check if we've already fetched this URL in this visit
-        if (fetchedPages.has(currentUrl)) {
-            console.log('Auto-fetch already completed for this URL in current visit');
-            return;
-        }
-        
-        // Mark as being fetched
-        fetchedPages.add(currentUrl);
-        isCurrentlyFetching = true;
-        
-        console.log('Starting auto-fetch of templates...');
-        showLoadingState();
-        
+    
+    // Core function to fetch templates
+    async function fetchTemplates() {
         try {
+            log('Starting template fetch');
+            
+            // Call the Odoo method to fetch templates
             const result = await makeRpcCall('lipachat.template', 'action_fetch_templates', [], {});
-            console.log('Auto-fetch successful:', result);
             
-            // Remove loading state - no reload needed
-            removeLoadingState();
+            log('Template fetch completed', result);
+            return result;
             
-            // Try to refresh the list view data without full page reload
-            await refreshListView();
-            
-        } catch (e) {
-            console.error('Auto-fetch failed:', e);
-            removeLoadingState();
-            
-            // Remove from fetched pages on error so it can be retried
-            fetchedPages.delete(currentUrl);
-            
-            // Show error notification
-            const notification = document.createElement('div');
-            notification.className = 'alert alert-warning alert-dismissible';
-            notification.style.margin = '10px';
-            notification.innerHTML = `
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-                <strong>Notice:</strong> Could not auto-load templates. Use the "Fetch Templates" button to load manually.
-            `;
-            
-            const target = document.querySelector('.o_control_panel') || document.querySelector('.o_list_view');
-            if (target) {
-                target.insertAdjacentElement('afterend', notification);
-            }
-        } finally {
-            isCurrentlyFetching = false;
+        } catch (error) {
+            log('Error fetching templates', error);
+            throw new Error(`Failed to fetch templates: ${error.message}`);
         }
     }
-
-    // Try to refresh the list view without full page reload
+    
+    // Refresh the list view after fetching
     async function refreshListView() {
         try {
-            // Method 1: Try to trigger Odoo's list view refresh
-            if (window.odoo && window.odoo.__DEBUG__ && window.odoo.__DEBUG__.services) {
-                const actionService = window.odoo.__DEBUG__.services['action'];
-                if (actionService && actionService.doAction) {
-                    await actionService.doAction('reload');
-                    console.log('List view refreshed via action service');
-                    return;
-                }
-            }
+            log('Refreshing list view');
             
-            // Method 2: Try to find and click a refresh button
-            const refreshBtn = document.querySelector('.o_cp_action_menus .o_dropdown_toggler_btn') || 
-                              document.querySelector('.o_control_panel .fa-refresh') ||
-                              document.querySelector('[data-hotkey="r"]');
-            if (refreshBtn) {
-                refreshBtn.click();
-                console.log('List view refreshed via refresh button');
+            // Simple page reload - most reliable method
+            window.location.reload();
+            
+        } catch (error) {
+            log('Error refreshing list view', error);
+            window.location.reload();
+        }
+    }
+    
+    // Handle automatic fetch on page load
+    async function handleAutoFetch() {
+        try {
+            // Check if we've already auto-fetched for this session
+            const sessionKey = `lipachat_fetched_${window.location.pathname}${window.location.search}`;
+            if (sessionStorage.getItem(sessionKey)) {
+                log('Auto-fetch already completed for this session');
                 return;
             }
             
-            // Method 3: Fallback - show success message instead of reload
-            const successDiv = document.createElement('div');
-            successDiv.className = 'alert alert-success alert-dismissible';
-            successDiv.style.margin = '10px';
-            successDiv.innerHTML = `
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-                <strong>Success:</strong> Templates fetched successfully. Refresh the page to see the latest data.
-            `;
+            log('Starting auto-fetch process');
             
-            const target = document.querySelector('.o_control_panel') || document.querySelector('.o_list_view');
-            if (target) {
-                target.insertAdjacentElement('afterend', successDiv);
+            // Show loading immediately
+            showLoading();
+            
+            try {
+                // Fetch templates
+                await fetchTemplates();
                 
-                // Auto-dismiss after 5 seconds
-                setTimeout(() => {
-                    if (successDiv.parentNode) {
-                        successDiv.remove();
-                    }
-                }, 5000);
+                // Mark as fetched for this session
+                sessionStorage.setItem(sessionKey, 'true');
+                
+                // Wait a bit for backend processing
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Refresh to show the data
+                log('Auto-fetch completed, refreshing page');
+                window.location.reload();
+                
+            } catch (error) {
+                log('Auto-fetch failed', error);
+                removeLoading();
+                showNotification(`Auto-fetch failed: ${error.message}`, 'warning', 10000);
             }
             
-            console.log('Fallback: showed success message');
-            
-        } catch (e) {
-            console.error('Could not refresh list view:', e);
-            // Show success message as fallback
-            const successDiv = document.createElement('div');
-            successDiv.className = 'alert alert-success alert-dismissible';
-            successDiv.style.margin = '10px';
-            successDiv.innerHTML = `
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-                <strong>Success:</strong> Templates fetched successfully. Refresh the page to see the latest data.
-            `;
-            
-            const target = document.querySelector('.o_control_panel') || document.querySelector('.o_list_view');
-            if (target) {
-                target.insertAdjacentElement('afterend', successDiv);
-            }
+        } catch (error) {
+            log('Error in auto-fetch handler', error);
+            removeLoading();
         }
     }
-
-    // Initialize when page loads
-    function initializePage() {
-        if (isLipachatTemplateListView()) {
-            console.log('Detected lipachat template list view');
-            addFetchButton();
-            
-            // Auto-fetch after a short delay to ensure page is fully loaded
-            setTimeout(() => {
-                autoFetchOnLoad();
-            }, 1000);
-        }
-    }
-
-    // Handle both initial load and navigation
-    function handlePageLoad() {
-        // Clear any existing loading states when navigating
-        removeLoadingState();
-        
-        // Initialize the page
-        setTimeout(() => {
-            initializePage();
-        }, 100);
-    }
-
-    // Event listeners
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', handlePageLoad);
-    } else {
-        handlePageLoad();
-    }
-
-    // Enhanced URL change detection for Odoo SPA navigation
-    let currentUrl = window.location.href;
     
-    // Method 1: MutationObserver for DOM changes
-    const domObserver = new MutationObserver(() => {
-        if (window.location.href !== currentUrl) {
-            const oldUrl = currentUrl;
-            currentUrl = window.location.href;
-            console.log('URL changed from', oldUrl, 'to', currentUrl);
-            setTimeout(handlePageLoad, 300);
-        }
-    });
-
-    if (document.body) {
-        domObserver.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    }
-
-    // Method 2: Listen for popstate events (browser back/forward)
-    window.addEventListener('popstate', () => {
-        console.log('Popstate event detected');
-        setTimeout(handlePageLoad, 300);
-    });
-
-    // Method 3: Override pushState and replaceState to catch programmatic navigation
-    const originalPushState = history.pushState;
-    const originalReplaceState = history.replaceState;
-
-    history.pushState = function(...args) {
-        originalPushState.apply(history, args);
-        console.log('PushState detected');
-        setTimeout(handlePageLoad, 300);
-    };
-
-    history.replaceState = function(...args) {
-        originalReplaceState.apply(history, args);
-        console.log('ReplaceState detected');
-        setTimeout(handlePageLoad, 300);
-    };
-
-    // Method 4: Periodic URL checking as fallback
-    setInterval(() => {
-        if (window.location.href !== currentUrl) {
-            const oldUrl = currentUrl;
-            currentUrl = window.location.href;
-            console.log('Periodic check: URL changed from', oldUrl, 'to', currentUrl);
-            handlePageLoad();
-        }
-    }, 1000);
-
-    // Clear fetched pages when navigating away from templates
-    function clearFetchedPagesIfNeeded() {
-        if (!isLipachatTemplateListView()) {
-            if (fetchedPages.size > 0) {
-                console.log('Clearing fetched pages cache as we left template view');
-                fetchedPages.clear();
-                isCurrentlyFetching = false;
+    // Initialize the extension with retry mechanism
+    function initialize() {
+        try {
+            log('Initializing Lipachat Template Manager');
+            log('Document ready state:', document.readyState);
+            log('Page URL:', window.location.href);
+            
+            if (isTemplateListView()) {
+                log('Template list view detected, starting auto-fetch');
+                
+                // Wait a bit for the page to settle, then start auto-fetch
+                setTimeout(() => {
+                    handleAutoFetch();
+                }, 1000);
+            } else {
+                log('Not a template list view, skipping auto-fetch');
             }
+            
+        } catch (error) {
+            log('Initialization error', error);
         }
     }
-
-    // Check periodically if we need to clear the cache
-    setInterval(clearFetchedPagesIfNeeded, 2000);
-
-    // Cleanup on page unload
-    window.addEventListener('beforeunload', () => {
-        domObserver.disconnect();
-        fetchedPages.clear();
-        isCurrentlyFetching = false;
+    
+    // Retry initialization with multiple attempts
+    function initializeWithRetry() {
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        const tryInit = () => {
+            attempts++;
+            log(`Initialization attempt ${attempts}/${maxAttempts}`);
+            
+            try {
+                initialize();
+                
+                // If we successfully added the button, we're good
+                if (document.getElementById('fetch-templates-btn')) {
+                    log('Initialization successful');
+                    return;
+                }
+            } catch (error) {
+                log('Initialization attempt failed', error);
+            }
+            
+            // Retry if we haven't reached max attempts
+            if (attempts < maxAttempts) {
+                setTimeout(tryInit, 1000);
+            } else {
+                log('All initialization attempts failed');
+            }
+        };
+        
+        tryInit();
+    }
+    
+    // Start initialization
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeWithRetry);
+    } else {
+        initializeWithRetry();
+    }
+    
+    // Also try to initialize on hash change and popstate (for SPA navigation)
+    window.addEventListener('hashchange', () => {
+        log('Hash change detected, re-initializing');
+        setTimeout(initializeWithRetry, 500);
     });
-
+    
+    window.addEventListener('popstate', () => {
+        log('Popstate detected, re-initializing');
+        setTimeout(initializeWithRetry, 500);
+    });
+    
 })();
