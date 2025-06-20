@@ -525,20 +525,20 @@ class WhatsappChat(models.TransientModel):
         """
         return super().create(vals)
 
+
     @api.depends('contact_partner_id', 'last_refresh')
     def _compute_contacts_html(self):
         """
         Computes the HTML for the list of conversations (contacts) on the left panel.
         Groups messages by partner and shows the latest message and count.
         Highlights the currently selected contact.
-        
-        IMPORTANT: The JavaScript in here will be modified to use RPC.
         """
         for record in self:
             _logger.debug(f"Computing contacts_html for record ID: {record.id}, selected_partner_id: {record.contact_partner_id}")
             
+            # Only include messages with status 'sent'
             messages = self.env['lipachat.message'].search([
-                ('state', 'in', ['sent', 'delivered', 'failed', 'received']), 
+                ('state', '=', 'sent'), 
                 ('is_bulk_template', '=', False),
                 ('partner_id', '!=', False)
             ])
@@ -563,8 +563,8 @@ class WhatsappChat(models.TransientModel):
                         contacts_data[partner.id]['latest_date'] = msg.create_date
 
             sorted_contacts = sorted(contacts_data.items(), 
-                                   key=lambda x: x[1]['latest_date'], 
-                                   reverse=True)
+                                key=lambda x: x[1]['latest_date'], 
+                                reverse=True)
 
             html = '<div class="contacts-list">'
             if not sorted_contacts:
@@ -583,12 +583,11 @@ class WhatsappChat(models.TransientModel):
                     is_expired = not (session and session.session_active)
                     contact_color = 'red' if is_expired else '#25D366'
                     
-                    # No need to escape for onlick here, as it's handled by a global JS handler now
                     html += f'''
                     <div class="contact-item {selected_class}" data-partner-id="{partner_id}" data-contact-name="{contact_info['name']}" 
-                         style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; border-radius: 5px; margin-bottom: 5px; {selected_style}"
-                         onmouseover="if(!this.classList.contains('selected')) this.style.backgroundColor='#f8f9fa'" 
-                         onmouseout="if(!this.classList.contains('selected')) this.style.backgroundColor='white'">
+                        style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; border-radius: 5px; margin-bottom: 5px; {selected_style}"
+                        onmouseover="if(!this.classList.contains('selected')) this.style.backgroundColor='#f8f9fa'" 
+                        onmouseout="if(!this.classList.contains('selected')) this.style.backgroundColor='white'">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
                                 <strong style="color: #25D366;">{contact_info['name']}</strong>
@@ -609,9 +608,9 @@ class WhatsappChat(models.TransientModel):
                     '''
             html += '</div>'
             
-            # Remove all the embedded <script> tags from here.
-            # We will handle JavaScript in a separate, persistent asset file.
             record.contacts_html = html
+
+
 
     @api.depends('contact_partner_id', 'last_refresh')
     def _compute_messages_html(self):
@@ -733,7 +732,8 @@ class WhatsappChat(models.TransientModel):
         """
         domain = [
             ('partner_id', '=', partner_id),
-            ('is_bulk_template', '=', False)
+            ('is_bulk_template', '=', False),
+            ('state', '=', 'sent')  # Only include sent messages
         ]
         if last_message_id:
             domain.append(('id', '>', last_message_id))
@@ -751,6 +751,9 @@ class WhatsappChat(models.TransientModel):
             'template_name': msg.template_name,
             'error_message': msg.error_message
         } for msg in messages]
+    
+
+
 
     @api.depends('contact_partner_id', 'last_refresh')
     def _compute_messages(self):
@@ -898,11 +901,9 @@ class WhatsappChat(models.TransientModel):
         New RPC method to fetch and render the contacts list HTML.
         This can be used to refresh the left panel without a full form reload.
         """
-        # Re-use the logic from _compute_contacts_html but without record context
-        # This will simulate the compute, but can be called directly by JS
-        
+        # Only include messages with status 'sent'
         messages = self.env['lipachat.message'].search([
-            ('state', 'in', ['sent', 'delivered', 'failed', 'received']), 
+            ('state', '=', 'sent'), 
             ('is_bulk_template', '=', False),
             ('partner_id', '!=', False)
         ])
@@ -927,33 +928,25 @@ class WhatsappChat(models.TransientModel):
                     contacts_data[partner.id]['latest_date'] = msg.create_date
 
         sorted_contacts = sorted(contacts_data.items(), 
-                               key=lambda x: x[1]['latest_date'], 
-                               reverse=True)
+                            key=lambda x: x[1]['latest_date'], 
+                            reverse=True)
 
         html = '<div class="contacts-list">'
         if not sorted_contacts:
             html += '<p class="text-muted" style="padding: 10px;">No conversations found. Send a message to start chatting or wait for incoming messages.</p>'
         else:
-            # Need to get the currently selected partner ID from the transient model instance.
-            # Since this is an @api.model method, we don't have 'self' as a recordset.
-            # We'll rely on the JS to re-apply the selection highlight after updating this HTML.
-            
-            # For simplicity, let's assume the JS will manage the 'selected' class.
-            # So, the `selected_style` and `selected_class` logic is removed from Python for this RPC.
-            # It will be applied by JS based on `data-partner-id`.
-            
             for partner_id, contact_info in sorted_contacts:
                 if contact_info['latest_date'] and contact_info['latest_date'] != datetime.min:
                     eat_date = contact_info['latest_date'] + timedelta(hours=3)
                     date_display = eat_date.strftime('%m/%d %H:%M')
                 else:
                     date_display = ''
-           
+        
                 html += f'''
                 <div class="contact-item" data-partner-id="{partner_id}" data-contact-name="{contact_info['name']}" 
-                     style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; border-radius: 5px; margin-bottom: 5px;"
-                     onmouseover="if(!this.classList.contains('selected')) this.style.backgroundColor='#f8f9fa'" 
-                     onmouseout="if(!this.classList.contains('selected')) this.style.backgroundColor='white'">
+                    style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; border-radius: 5px; margin-bottom: 5px;"
+                    onmouseover="if(!this.classList.contains('selected')) this.style.backgroundColor='#f8f9fa'" 
+                    onmouseout="if(!this.classList.contains('selected')) this.style.backgroundColor='white'">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <strong style="color: #25D366;">{contact_info['name']}</strong>
@@ -982,6 +975,7 @@ class WhatsappChat(models.TransientModel):
         New RPC method to immediately get the most recent contact for faster initialization
         """
         most_recent_message = self.env['lipachat.message'].search([
+            ('state', '=', 'sent'),  # Only include sent messages
             ('is_bulk_template', '=', False),
             ('partner_id', '!=', False)
         ], order='create_date desc', limit=1)
@@ -993,6 +987,8 @@ class WhatsappChat(models.TransientModel):
             }
         
         return {}
+    
+    
     
     @api.model
     def get_initial_chat_data(self):
