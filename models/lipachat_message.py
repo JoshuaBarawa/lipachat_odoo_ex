@@ -71,7 +71,7 @@ class LipachatMessage(models.Model):
     buttons_data = fields.Text('Buttons Data (JSON)')
     
     # Template fields
-    template_name = fields.Many2one('lipachat.template', string='Template')
+    template_name = fields.Many2one('lipachat.template', string='Template', domain=lambda self: self._get_template_domain())
     template_media_url = fields.Char('Media URL', readonly="state != 'draft'")
     template_variables = fields.Char('Template Variables', compute='_compute_template_variables', store=False)
     template_placeholders = fields.Text('Placeholder Values', default='[]')
@@ -93,6 +93,11 @@ class LipachatMessage(models.Model):
     
     # Computed field for truncated message display
     message_text_short = fields.Char('Content Preview', compute='_compute_message_text_short', store=False)
+
+
+    def _get_template_domain(self):
+        """Return domain to filter templates based on approval status"""
+        return [('status', '=', 'approved')]
 
     @api.depends('template_name')
     def _compute_template_variables(self):

@@ -413,6 +413,7 @@
                 setTimeout(() => {
                     handleAutoFetch();
                 }, 1000);
+                
             } else {
                 log('Not a template list view, skipping auto-fetch');
             }

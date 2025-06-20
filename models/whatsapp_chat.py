@@ -42,7 +42,7 @@ class WhatsappChat(models.TransientModel):
     
 
     # Template fields
-    template_name = fields.Many2one('lipachat.template', nolabel="1")
+    template_name = fields.Many2one('lipachat.template', nolabel="1", domain=lambda self: self._get_template_domain())
     template_header_text = fields.Text()
     template_body_text = fields.Text()
     template_header_type = fields.Char('Header Type', store=False)
@@ -56,8 +56,12 @@ class WhatsappChat(models.TransientModel):
 
     template_variable_values = fields.Char('Body Variables')
 
-
     template_components = fields.Json('Template Components')
+
+
+    def _get_template_domain(self):
+        """Return domain to filter templates based on approval status"""
+        return [('status', '=', 'approved')]
 
     @api.onchange('template_name')
     def _onchange_template_name(self):
