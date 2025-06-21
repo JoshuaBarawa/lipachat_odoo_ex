@@ -17,12 +17,13 @@ class LipachatMessage(models.Model):
     _rec_name = 'message_id'
 
     message_id = fields.Char('Message ID', required=True, default=lambda self: str(uuid.uuid4()))
-    partner_id = fields.Many2one('res.partner', 'Contact')
-    partner_ids = fields.Many2many(
-        'res.partner',
-        string='Contacts',
-        help='Select multiple contacts to send this message to'
-    )
+    partner_id = fields.Many2one('res.partner', 'Contact', help='Select a contact to send this message to')
+    view_phone_number = fields.Char('Contact Phone')
+    # partner_ids = fields.Many2many(
+    #     'res.partner',
+    #     string='Contacts',
+    #     help='Select multiple contacts to send this message to'
+    # )
     phone_number = fields.Char('Phone Number')
     fail_reason = fields.Text('Fail Reason', readonly=True)
     
@@ -98,6 +99,16 @@ class LipachatMessage(models.Model):
     def _get_template_domain(self):
         """Return domain to filter templates based on approval status"""
         return [('status', '=', 'approved')]
+    
+
+    @api.onchange('partner_id')
+    def _onchange_partner_id(self):
+        for record in self:
+            if record.partner_id:
+                record.view_phone_number = record.partner_id.mobile or record.partner_id.phone
+            else:
+                record.view_phone_number = False
+
 
     @api.depends('template_name')
     def _compute_template_variables(self):
@@ -170,11 +181,15 @@ class LipachatMessage(models.Model):
             else:
                 record.message_text_short = ''
 
-    @api.constrains('partner_id', 'partner_ids', 'phone_number')
+    @api.constrains('partner_id', 'phone_number')
     def _check_recipients(self):
         for record in self:
-            if not record.partner_id and not record.partner_ids and not record.phone_number:
-                raise ValidationError(_("You must specify at least one recipient (contact)"))
+            if not record.partner_id and not record.phone_number:
+                raise ValidationError(_("You must specify either a contact or a phone number"))
+            if record.partner_id and record.phone_number:
+                raise ValidationError(_("Please specify only one recipient - either a contact or a phone number"))
+            
+
             
     @api.constrains('message_type', 'message_text')
     def _check_message_content(self):
@@ -193,35 +208,36 @@ class LipachatMessage(models.Model):
             cleaned = cleaned[1:]
         return cleaned
 
+
     def send_message(self):
-        """Send WhatsApp message via LipaChat API to one or multiple contacts"""
+        """Send WhatsApp message via LipaChat API to one contact"""
         config = self.config_id
         if not config:
             raise ValidationError(_("Please select a valid LipaChat configuration."))
 
-        # Determine recipients
-        recipients = []
-        if self.phone_number:
-            recipients.append({
+        # Determine recipient
+        recipient = {}
+        if self.partner_id:
+            phone = self.partner_id.mobile or self.partner_id.phone
+            if not phone:
+                raise ValidationError(_("Selected contact doesn't have a phone number"))
+            recipient = {
+                'phone': self._clean_phone_number(phone),
+                'name': self.partner_id.name,
+                'partner_id': self.partner_id.id
+            }
+        elif self.phone_number:
+            recipient = {
                 'phone': self._clean_phone_number(self.phone_number),
-                'name': self.partner_id.name if self.partner_id else self.phone_number,
-                'partner_id': self.partner_id.id if self.partner_id else False
-            })
-        if self.partner_ids:
-            for partner in self.partner_ids:
-                phone = partner.mobile or partner.phone
-                if phone:
-                    recipients.append({
-                        'phone': self._clean_phone_number(phone),
-                        'name': partner.name,
-                        'partner_id': partner.id
-                    })
+                'name': self.phone_number,
+                'partner_id': False
+            }
         
-        if not recipients:
-            raise ValidationError(_("No valid recipients found. Please check phone numbers."))
+        if not recipient:
+            raise ValidationError(_("No valid recipient found. Please check phone number."))
         
-        # Always create individual message records, even for single recipients
-        return self._send_bulk_messages(recipients, config)
+        return self._send_single_message(recipient, config)
+    
 
     def _send_bulk_messages(self, recipients, config):
         """Create individual message records for each recipient and send them"""
@@ -247,7 +263,7 @@ class LipachatMessage(models.Model):
             # Create individual message record
             individual_msg = self.copy({
                 'partner_id': recipient['partner_id'],
-                'partner_ids': [(5, 0, 0)],  # Clear many2many field
+                # 'partner_ids': [(5, 0, 0)],  # Clear many2many field
                 'phone_number': recipient['phone'],
                 'is_bulk_template': False,
                 'bulk_parent_id': self.id,

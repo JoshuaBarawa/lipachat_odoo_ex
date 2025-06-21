@@ -6,25 +6,25 @@
             <style type="text/css">
                 /* Previous CSS styles remain unchanged */
                 /* Add this new style for the many2many tags */
-                .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags {
+                <!-- .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags {
                     width: 100%;
                     min-height: 34px;
                     border-radius: 8px !important;
                     border: 2px solid #e9ecef !important;
                     padding: 5px !important;
                     background: white !important;
-                }
-                .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags .badge {
+                } -->
+                <!-- .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags .badge {
                     background: linear-gradient(135deg, #25D366 0%, #128C7E 100%) !important;
                     color: white !important;
                     border: none !important;
                     margin: 2px !important;
                     padding: 5px 10px !important;
                     border-radius: 12px !important;
-                }
-                .lipachat-message-form .o_field_widget[name="partner_ids"] .o_input_dropdown {
+                } -->
+                <!-- .lipachat-message-form .o_field_widget[name="partner_ids"] .o_input_dropdown {
                     width: 100% !important;
-                }
+                } -->
                 .lipachat-message-form .recipient-selection {
                     margin-bottom: 15px;
                     border-bottom: 1px solid #e9ecef;
@@ -73,14 +73,26 @@
                             <field name="bulk_parent_id" readonly="1" string="View bulk template"/>
                         </div>
 
-                        <div class="recipient-selection">
-                            <!-- <h2></h2> -->
+                        <div class="recipient-selection row">
+                         <group>
                             <group>
-                                <field name="partner_ids" widget="many2many_tags" 
+                                <!-- <field name="partner_ids" widget="many2many_tags" 
                                     placeholder="Select contacts..."
                                     options="{'no_create': True}"
+                                    readonly="state != 'draft'"/> -->
+
+                                <field name="partner_id" 
+                                    placeholder="Select a contact..."
+                                    options="{'no_create': True}"
                                     readonly="state != 'draft'"/>
+
+                                 <field name="view_phone_number" 
+                                    readonly="1"
+                                    string="Contact Phone"
+                                    invisible="not partner_id or state != 'draft'"
+                                    optional="hide"/>
                             </group>
+                         </group>
                         </div>
 
                         <group>
