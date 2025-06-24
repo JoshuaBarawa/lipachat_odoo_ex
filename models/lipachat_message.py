@@ -106,8 +106,10 @@ class LipachatMessage(models.Model):
         for record in self:
             if record.partner_id:
                 record.view_phone_number = record.partner_id.mobile or record.partner_id.phone
+                record.phone_number = record.partner_id.mobile or record.partner_id.phone
             else:
                 record.view_phone_number = False
+                record.phone_number = False
 
 
     @api.depends('template_name')
@@ -169,25 +171,34 @@ class LipachatMessage(models.Model):
                 
         return components
 
-    @api.depends('message_text')
+    @api.depends('message_text', 'message_type', 'template_name')
     def _compute_message_text_short(self):
         for record in self:
-            if record.message_text:
-                # Truncate to 50 characters and add ellipsis if longer
-                if len(record.message_text) > 50:
-                    record.message_text_short = record.message_text[:50] + '...'
+            try:
+                if record.message_type == 'template' and record.template_name:
+                    # Show template name for template messages
+                    record.message_text_short = record.template_name.name
+                elif record.message_text:
+                    # Truncate to 50 characters and add ellipsis if longer
+                    if len(record.message_text) > 50:
+                        record.message_text_short = record.message_text[:50] + '...'
+                    else:
+                        record.message_text_short = record.message_text
                 else:
-                    record.message_text_short = record.message_text
-            else:
+                    record.message_text_short = ''
+            except Exception as e:
+                _logger.error(f"Error computing message_text_short: {str(e)}")
                 record.message_text_short = ''
+
+
 
     @api.constrains('partner_id', 'phone_number')
     def _check_recipients(self):
         for record in self:
             if not record.partner_id and not record.phone_number:
                 raise ValidationError(_("You must specify either a contact or a phone number"))
-            if record.partner_id and record.phone_number:
-                raise ValidationError(_("Please specify only one recipient - either a contact or a phone number"))
+            # if record.partner_id and record.phone_number:
+            #     raise ValidationError(_("Please specify only one recipient - either a contact or a phone number"))
             
 
             
