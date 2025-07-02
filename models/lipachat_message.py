@@ -1,6 +1,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from odoo.exceptions import UserError
 import requests
 import json
@@ -347,7 +347,29 @@ class LipachatMessage(models.Model):
             }
             
             _logger.debug(f"Creating message with vals: {vals}")
-            return self.create(vals)
+
+            # Create the record first without timestamps
+            vals_without_timestamps = vals.copy()
+            create_date = vals_without_timestamps.pop('create_date')
+            write_date = vals_without_timestamps.pop('write_date')
+
+            record = self.create(vals_without_timestamps)
+
+             # Then update the timestamps directly in the database
+            # This bypasses Odoo's ORM restrictions on system fields
+            self.env.cr.execute("""
+                UPDATE %s 
+                SET create_date = %%s, write_date = %%s 
+                WHERE id = %%s
+            """ % record._table, (create_date, write_date, record.id))
+            
+            # Invalidate cache to ensure the updated values are reflected
+            record.invalidate_cache(['create_date', 'write_date'])
+            
+            _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
+        
+        
+            return record
             
         except Exception as e:
             _logger.error(f"Failed to create message from API data: {str(e)}")
@@ -381,7 +403,7 @@ class LipachatMessage(models.Model):
     
     
     def _parse_timestamp(self, timestamp):
-        """Parse timestamp from API response"""
+        """Parse timestamp from API response with better error handling"""
         if not timestamp:
             return fields.Datetime.now()
         
@@ -391,15 +413,33 @@ class LipachatMessage(models.Model):
                 return datetime.fromtimestamp(timestamp)
             elif isinstance(timestamp, str):
                 # Try different datetime formats
-                for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S']:
+                formats_to_try = [
+                    '%Y-%m-%dT%H:%M:%S.%f%z',  # 2025-06-24T08:25:02.508+00:00
+                    '%Y-%m-%dT%H:%M:%S.%fZ',   # 2025-06-24T08:25:02.508Z
+                    '%Y-%m-%dT%H:%M:%S%z',     # 2025-06-24T08:25:02+00:00
+                    '%Y-%m-%dT%H:%M:%SZ',      # 2025-06-24T08:25:02Z
+                    '%Y-%m-%d %H:%M:%S',       # 2025-06-24 08:25:02
+                ]
+                
+                for fmt in formats_to_try:
                     try:
-                        return datetime.strptime(timestamp, fmt)
+                        parsed_dt = datetime.strptime(timestamp, fmt)
+                        # Convert to UTC if it's a naive datetime
+                        if parsed_dt.tzinfo is None:
+                            parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+                        # Convert to naive datetime in UTC for Odoo
+                        return parsed_dt.replace(tzinfo=None)
                     except ValueError:
                         continue
+                        
+            _logger.warning(f"Could not parse timestamp format: {timestamp}")
+            return fields.Datetime.now()
+            
         except Exception as e:
             _logger.warning(f"Failed to parse timestamp {timestamp}: {str(e)}")
+            return fields.Datetime.now()
         
-        return fields.Datetime.now()
+
     
     def _find_or_create_partner(self, phone_number):
         """Find existing partner by phone or create a new one"""
