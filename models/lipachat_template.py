@@ -169,7 +169,7 @@ class LipachatTemplate(models.Model):
                     vals["header_type"] = comp.get("format")
                     vals["header_text"] = comp.get("text") or None
                     # Add image/video/document handling if needed
-                    if comp.get("format") == "IMAGE":
+                    if comp.get("format") in ['IMAGE', 'VIDEO', 'DOCUMENT']:
                         vals["header_example"] = comp.get("example", {}).get("header_handle", [None])[0]
                         vals["header_media_id"] = comp.get("example", {}).get("header_handle", [None])[0]
                     else:

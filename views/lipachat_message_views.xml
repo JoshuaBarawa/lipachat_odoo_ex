@@ -1,54 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Custom CSS for LipaChat Message Styling -->
-        <template id="lipachat_message_assets" name="LipaChat Message Assets">
-            <style type="text/css">
-                /* Previous CSS styles remain unchanged */
-                /* Add this new style for the many2many tags */
-                <!-- .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags {
-                    width: 100%;
-                    min-height: 34px;
-                    border-radius: 8px !important;
-                    border: 2px solid #e9ecef !important;
-                    padding: 5px !important;
-                    background: white !important;
-                } -->
-                <!-- .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags .badge {
-                    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%) !important;
-                    color: white !important;
-                    border: none !important;
-                    margin: 2px !important;
-                    padding: 5px 10px !important;
-                    border-radius: 12px !important;
-                } -->
-                <!-- .lipachat-message-form .o_field_widget[name="partner_ids"] .o_input_dropdown {
-                    width: 100% !important;
-                } -->
-                .lipachat-message-form .recipient-selection {
-                    margin-bottom: 15px;
-                    border-bottom: 1px solid #e9ecef;
-                    padding-bottom: 15px;
-                }
-                /* Style for bulk template indicator */
-                .bulk-template-indicator {
-                    background: #fff3cd;
-                    border: 1px solid #ffeeba;
-                    color: #856404;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    margin-bottom: 10px;
-                }
-                /* Truncate long content in tree view */
-                .o_list_view .o_data_cell[name="message_text"] {
-                    max-width: 200px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                }
-            </style>
-        </template>
-
         <!-- Message Form View -->
         <record id="view_lipachat_message_form" model="ir.ui.view">
             <field name="name">lipachat.message.form</field>

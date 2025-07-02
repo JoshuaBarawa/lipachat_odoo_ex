@@ -666,15 +666,15 @@ class LipachatMessage(models.Model):
         # Update bulk template status
         total_messages = len(individual_messages)
         if success_count == total_messages:
-            self.state = 'sent'
+            self.state = 'SENT'
         elif success_count == 0:
-            self.state = 'failed'
+            self.state = 'FAILED'
         else:
             self.state = 'partially_sent'
         
         # Update summary fields on template
-        sent_contacts = [msg.partner_id.name or msg.phone_number for msg in individual_messages if msg.state == 'sent']
-        failed_contacts = [f"{msg.partner_id.name or msg.phone_number}: {msg.error_message}" for msg in individual_messages if msg.state == 'failed']
+        sent_contacts = [msg.partner_id.name or msg.phone_number for msg in individual_messages if msg.state == 'SENT']
+        failed_contacts = [f"{msg.partner_id.name or msg.phone_number}: {msg.error_message}" for msg in individual_messages if msg.state == 'FAILED']
         
         self.sent_contacts = ', '.join(sent_contacts) if sent_contacts else ''
         self.failed_contacts = '\n'.join(failed_contacts) if failed_contacts else ''
@@ -707,7 +707,7 @@ class LipachatMessage(models.Model):
                         "No active session. Send a template message first to start a session."
                     )
                     self.write({
-                        'state': 'failed',
+                        'state': 'FAILED',
                         'error_message': fail_reason,
                         'fail_reason': fail_reason
                     })
@@ -716,7 +716,7 @@ class LipachatMessage(models.Model):
             # Send the message
             send_method = getattr(self, f'_send_{self.message_type}_message')
             if send_method(config, headers, recipient):
-                self.state = 'sent'
+                self.state = 'SENT'
                 self.sent_contacts = f"{recipient['name']} ({recipient['phone']})"
                 
                 # Start new session only if:
@@ -733,7 +733,7 @@ class LipachatMessage(models.Model):
             else:
                 fail_reason = "Unexpected API response status"
                 self.write({
-                    'state': 'failed',
+                    'state': 'FAILED',
                     'error_message': fail_reason,
                     'fail_reason': fail_reason
                 })
@@ -743,7 +743,7 @@ class LipachatMessage(models.Model):
             fail_reason = str(e)
             _logger.error(f"Failed to send to {recipient['phone']}: {fail_reason}")
             self.write({
-                'state': 'failed',
+                'state': 'FAILED',
                 'error_message': fail_reason,
                 'fail_reason': fail_reason
             })
