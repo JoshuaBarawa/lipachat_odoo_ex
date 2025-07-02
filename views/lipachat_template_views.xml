@@ -95,8 +95,8 @@
                         </group>
 
                           <!-- component data debug -->
-                          <group string="component data debug" class="mt16">
-                            <field name="component_data"/>
+                          <group string="component data debug" class="mt16" invisible="1">
+                            <field name="component_data" invisible="1"/>
                         </group>
 
                         

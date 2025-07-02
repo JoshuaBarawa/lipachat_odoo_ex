@@ -52,41 +52,27 @@
     function isTemplateListView() {
         try {
             const url = window.location.href;
-            const pathname = window.location.pathname;
-            const search = window.location.search;
             const hash = window.location.hash;
             
             log('Current URL:', url);
-            log('Pathname:', pathname);
-            log('Search params:', search);
             log('Hash:', hash);
             
-            // Check URL patterns - updated to match your specific URL structure
-            const urlChecks = [
-                url.toLowerCase().includes('model=lipachat.template'),
-                url.toLowerCase().includes('lipachat.template'),
-                hash.toLowerCase().includes('model=lipachat.template'),
-                // pathname.includes('/web')
-            ];
+            // Check both URL and hash for the required parameters
+            const fullUrlToCheck = url + hash;
+            const lowerUrl = fullUrlToCheck.toLowerCase();
             
-            log('URL checks:', urlChecks);
+            // Both conditions must be true
+            const hasTemplateModel = lowerUrl.includes('model=lipachat.template');
+            const hasListView = lowerUrl.includes('view_type=list');
             
-            // Check DOM elements
-            const breadcrumb = document.querySelector('.breadcrumb');
-            const viewTitle = document.querySelector('.o_control_panel .o_breadcrumb_item.active');
-            const bodyClasses = document.body.className;
+            log('Has model=lipachat.template:', hasTemplateModel);
+            log('Has view_type=list:', hasListView);
             
-            // log('Breadcrumb text:', breadcrumb?.textContent);
-            // log('View title text:', viewTitle?.textContent);
-            log('Body classes:', bodyClasses);
+            // Only return true if BOTH conditions are met
+            const isTemplateListView = hasTemplateModel && hasListView;
             
-            // More flexible detection
-            const isTemplate = urlChecks.some(check => check) || 
-                              (breadcrumb && breadcrumb.textContent.toLowerCase().includes('template')) ||
-                              (viewTitle && viewTitle.textContent.toLowerCase().includes('template'));
-            
-            log('Is template view:', isTemplate);
-            return isTemplate;
+            log('Is template list view (both conditions met):', isTemplateListView);
+            return isTemplateListView;
             
         } catch (error) {
             log('Error checking template list view', error);
