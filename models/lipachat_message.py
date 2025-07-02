@@ -116,7 +116,7 @@ class LipachatMessage(models.Model):
                 total_fetched += fetched
                 total_new += new
             except Exception as e:
-                _logger.error(f"Failed to fetch messages for config {config.id}: {str(e)}")
+                _logger.error(f"Failed to fetch messages for config {config.name}: {str(e)}")
                 continue
         
         return {
@@ -130,6 +130,7 @@ class LipachatMessage(models.Model):
             }
         }
     
+
     def _fetch_messages_for_config(self, config):
         """Fetch messages for a specific configuration"""
         if not config.api_key:
@@ -137,52 +138,97 @@ class LipachatMessage(models.Model):
         
         headers = {
             'apiKey': config.api_key,
-            'Content-Type': 'application/json'
         }
+
+        _logger.info(f"API Request header: {headers}")
         
         try:
-            # Fetch messages from API
-            response = requests.get(
-                f"{config.api_base_url}/whatsapp/message",
-                headers=headers,
-                timeout=30
-            )
+            # Initialize variables
+            all_messages = []
+            page = 0
+            total_pages = 1  # Will be updated from response
             
-            if response.status_code != 200:
-                raise ValidationError(_("Failed to fetch messages: HTTP %d") % response.status_code)
-            
-            response_data = response.json()
-            
-            if response_data.get('status') != 'success':
-                raise ValidationError(_("API Error: %s") % response_data.get('message', 'Unknown error'))
-            
-            messages = response_data.get('data', [])
-            if not isinstance(messages, list):
-                messages = [messages] if messages else []
-            
-            return self._process_fetched_messages(messages, config)
+            # Fetch all pages
+            while page < total_pages:
+                # Add pagination parameters
+                params = {
+                    'page': page,
+                    'size': 10  # Adjust page size as needed
+                }
+                
+                response = requests.get(
+                    f"{config.api_base_url}/whatsapp/message",
+                    headers=headers,
+                    # params=params,
+                    timeout=30
+                )
+                
+                # Log the raw response for debugging
+                _logger.info(f"API Response Status: {response}")
+                _logger.info(f"API Response Status: {response.status_code}")
+                _logger.debug(f"API Response Content: {response.text}")
+                
+                # if response.status_code != 200:
+                #     raise ValidationError(_("Failed to fetch messages: HTTP %d - %s") % 
+                #                         (response.status_code, response.text))
+                
+                try:
+                    response_data = response.json()
+                except ValueError as e:
+                    _logger.error(f"Invalid JSON response: {response.text}")
+                    raise ValidationError(_("Invalid API response format"))
+                
+                # Check if response has the expected structure
+                if not isinstance(response_data, dict) or 'data' not in response_data:
+                    _logger.error(f"Unexpected API response structure: {response_data}")
+                    raise ValidationError(_("Unexpected API response format"))
+                
+                # Add messages from this page
+                messages = response_data.get('data', [])
+                if messages:
+                    all_messages.extend(messages)
+                    _logger.info(f"Fetched {len(messages)} messages from page {page}")
+                
+                # Update pagination info
+                total_pages = response_data.get('totalPages', 1)
+                page += 1
+                
+            _logger.info(f"Total messages fetched: {len(all_messages)}")
+            return self._process_fetched_messages(all_messages, config)
             
         except requests.exceptions.RequestException as e:
+            _logger.error(f"Network error while fetching messages: {str(e)}")
             raise ValidationError(_("Network error while fetching messages: %s") % str(e))
+        
+
     
     def _process_fetched_messages(self, messages, config):
         """Process and store fetched messages"""
         fetched_count = len(messages)
         new_count = 0
         
+        _logger.info(f"Processing {fetched_count} messages")
+        
         for msg_data in messages:
             try:
+                # Skip if no message ID
+                if not msg_data.get('id'):
+                    _logger.warning("Skipping message with no ID")
+                    continue
+                    
                 # Check if message already exists
                 existing_msg = self.search([
-                    ('incoming_message_id', '=', msg_data.get('id')),
+                    ('incoming_message_id', '=', str(msg_data.get('id'))),
                     ('config_id', '=', config.id)
                 ], limit=1)
                 
                 if existing_msg:
                     # Update existing message status if needed
+                    _logger.debug(f"Updating existing message {msg_data.get('id')}")
                     self._update_existing_message(existing_msg, msg_data)
                 else:
                     # Create new message record
+                    _logger.debug(f"Creating new message {msg_data.get('id')}")
                     self._create_message_from_api_data(msg_data, config)
                     new_count += 1
                     
@@ -190,65 +236,90 @@ class LipachatMessage(models.Model):
                 _logger.error(f"Error processing message {msg_data.get('id', 'unknown')}: {str(e)}")
                 continue
         
+        _logger.info(f"Processed {fetched_count} messages, {new_count} new messages added")
         return fetched_count, new_count
     
+
+
     def _create_message_from_api_data(self, msg_data, config):
         """Create a new message record from API data"""
-        # Determine if it's incoming or outgoing
-        is_incoming = msg_data.get('direction') == 'incoming' or msg_data.get('from') != config.default_from_number
-        
-        # Find or create contact
-        partner_id = False
-        phone_number = msg_data.get('from') if is_incoming else msg_data.get('to')
-        
-        if phone_number:
-            phone_clean = self._clean_phone_number(phone_number)
-            partner = self._find_or_create_partner(phone_clean)
-            if partner:
-                partner_id = partner.id
-        
-        # Determine message type and content
-        message_type = 'text'
-        message_text = ''
-        media_type = False
-        media_url = False
-        caption = False
-        
-        if msg_data.get('type') == 'text':
-            message_type = 'text'
-            message_text = msg_data.get('text', {}).get('body', '') if isinstance(msg_data.get('text'), dict) else str(msg_data.get('text', ''))
-        elif msg_data.get('type') in ['image', 'video', 'document', 'audio']:
-            message_type = 'media'
-            media_type = msg_data.get('type').upper()
-            media_content = msg_data.get(msg_data.get('type'), {})
-            media_url = media_content.get('link') or media_content.get('url')
-            caption = media_content.get('caption', '')
-            message_text = caption
-        
-        # Determine status
-        state = 'received' if is_incoming else self._map_api_status_to_state(msg_data.get('status'))
-        
-        # Parse timestamp
-        received_at = self._parse_timestamp(msg_data.get('timestamp'))
-        
-        vals = {
-            'incoming_message_id': msg_data.get('id'),
-            'message_id': msg_data.get('id') or str(uuid.uuid4()),
-            'partner_id': partner_id,
-            'phone_number': phone_number,
-            'config_id': config.id,
-            'message_type': message_type,
-            'message_text': message_text,
-            'media_type': media_type,
-            'media_url': media_url,
-            'caption': caption,
-            'state': state,
-            'is_incoming': is_incoming,
-            'received_at': received_at,
-            'response_data': json.dumps(msg_data),
-        }
-        
-        return self.create(vals)
+        try:
+            # Determine if it's incoming or outgoing
+            direction = msg_data.get('direction', '').upper()
+            is_incoming = direction == 'INBOUND'
+            
+            # Get contact information
+            contact_data = msg_data.get('contact', {})
+            phone_number = contact_data.get('phoneNumber', '')
+            
+            # Find or create partner
+            partner_id = False
+            if phone_number:
+                phone_clean = self._clean_phone_number(phone_number)
+                partner = self._find_or_create_partner(phone_clean)
+                partner_id = partner.id if partner else False
+            
+            # Determine message type and content
+            msg_type = msg_data.get('type', '').upper()
+            message_type = 'text'  # default
+            message_text = msg_data.get('text', '')
+            media_type = False
+            media_url = False
+            caption = False
+            
+            if msg_type == 'IMAGE':
+                message_type = 'media'
+                media_type = 'IMAGE'
+                try:
+                    metadata = json.loads(msg_data.get('metadata', '{}'))
+                    media_url = metadata.get('url', '')
+                    caption = metadata.get('caption', '')
+                except json.JSONDecodeError:
+                    _logger.warning(f"Could not parse metadata for message {msg_data.get('id')}")
+            
+            elif msg_type == 'TEMPLATE':
+                message_type = 'template'
+            
+            # Map status
+            api_status = msg_data.get('status', '').upper()
+            status_mapping = {
+                'READ': 'read',
+                'DELIVERED': 'delivered',
+                'SENT': 'sent',
+                'FAILED': 'failed',
+            }
+            state = status_mapping.get(api_status, 'received' if is_incoming else 'sent')
+            
+            # Parse timestamps
+            created_at = self._parse_timestamp(msg_data.get('createdAt'))
+            updated_at = self._parse_timestamp(msg_data.get('updatedAt'))
+            
+            vals = {
+                'incoming_message_id': str(msg_data.get('id')),
+                'message_id': msg_data.get('waMessageId') or str(uuid.uuid4()),
+                'partner_id': partner_id,
+                'phone_number': phone_number,
+                'config_id': config.id,
+                'message_type': message_type,
+                'message_text': message_text,
+                'media_type': media_type,
+                'media_url': media_url,
+                'caption': caption,
+                'state': state,
+                'is_incoming': is_incoming,
+                'received_at': created_at,
+                'create_date': created_at,
+                'write_date': updated_at,
+                'response_data': json.dumps(msg_data, indent=2),
+            }
+            
+            _logger.debug(f"Creating message with vals: {vals}")
+            return self.create(vals)
+            
+        except Exception as e:
+            _logger.error(f"Failed to create message from API data: {str(e)}")
+            raise
+
     
     def _update_existing_message(self, existing_msg, msg_data):
         """Update existing message with new status information"""
@@ -261,10 +332,14 @@ class LipachatMessage(models.Model):
     
     def _map_api_status_to_state(self, api_status):
         """Map API status to internal state"""
+        if not api_status:
+            return 'draft'
+        
+        api_status = api_status.lower()
         status_mapping = {
-            'sent': 'sent',
-            'delivered': 'delivered',
             'read': 'read',
+            'delivered': 'delivered',
+            'sent': 'sent',
             'failed': 'failed',
             'pending': 'draft',
         }
