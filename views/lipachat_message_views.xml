@@ -54,10 +54,12 @@
             <field name="name">lipachat.message.form</field>
             <field name="model">lipachat.message</field>
             <field name="arch" type="xml">
+           
                 <form string="WhatsApp Message" class="lipachat-message-form">
                     <header>
                         <button name="send_message" string="Send Message" type="object" class="btn-primary" 
                                 invisible="state != 'draft'"/>
+                        <button name="fetch_all_messages" string="Sync Messages" type="object" class="oe_highlight"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -201,7 +203,6 @@
                     <field name="phone_number"/>
                     <field name="message_text"/>
                     <field name="state"/>
-                    
                     <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                     <filter string="Sent" name="sent" domain="[('state', '=', 'sent')]"/>
                     <filter string="Failed" name="failed" domain="[('state', '=', 'failed')]"/>
@@ -223,18 +224,18 @@
         </record>
 
         <!-- Individual Messages Action -->
-        <record id="action_lipachat_message_individual" model="ir.actions.act_window">
-            <field name="name">Individual WhatsApp Messages</field>
+        <record id="action_lipachat_message" model="ir.actions.act_window">
+            <field name="name">WhatsApp Messages</field>
             <field name="res_model">lipachat.message</field>
             <field name="view_mode">tree,form</field>
             <field name="domain">[('is_bulk_template', '=', False)]</field>
-            <field name="context">{'default_is_bulk_template': False}</field>
+            <field name="search_view_id" ref="view_lipachat_message_search"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    No individual WhatsApp messages yet
+                    No WhatsApp messages yet
                 </p>
                 <p>
-                    Individual message records are created automatically when you send bulk messages.
+                    Send your first WhatsApp message from a contact or create one here.
                 </p>
             </field>
         </record>

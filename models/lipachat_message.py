@@ -19,17 +19,17 @@ class LipachatMessage(models.Model):
     message_id = fields.Char('Message ID', required=True, default=lambda self: str(uuid.uuid4()))
     partner_id = fields.Many2one('res.partner', 'Contact', help='Select a contact to send this message to')
     view_phone_number = fields.Char('Contact Phone')
-    # partner_ids = fields.Many2many(
-    #     'res.partner',
-    #     string='Contacts',
-    #     help='Select multiple contacts to send this message to'
-    # )
     phone_number = fields.Char('Phone Number')
     fail_reason = fields.Text('Fail Reason', readonly=True)
     
     # Add field to track if this is a bulk message template
     is_bulk_template = fields.Boolean('Is Bulk Template', default=False)
     bulk_parent_id = fields.Many2one('lipachat.message', 'Bulk Parent Message')
+    
+    # Add fields for incoming messages
+    is_incoming = fields.Boolean('Is Incoming Message', default=False)
+    incoming_message_id = fields.Char('Incoming Message ID')
+    received_at = fields.Datetime('Received At')
     
     config_id = fields.Many2one(
         'lipachat.config',
@@ -76,15 +76,15 @@ class LipachatMessage(models.Model):
     template_media_url = fields.Char('Media URL', readonly="state != 'draft'")
     template_variables = fields.Char('Template Variables', compute='_compute_template_variables', store=False)
     template_placeholders = fields.Text('Placeholder Values', default='[]')
-  
     
     # Status fields
     state = fields.Selection([
         ('draft', 'Draft'),
         ('sent', 'Sent'),
-        # ('delivered', 'Delivered'),
+        ('delivered', 'Delivered'),
+        ('read', 'Read'),
         ('failed', 'Failed'),
-        # ('partially_sent', 'Partially Sent')
+        ('received', 'Received'),  # For incoming messages
     ], 'Status', default='draft')
     
     error_message = fields.Text('Error Message')
@@ -95,11 +95,239 @@ class LipachatMessage(models.Model):
     # Computed field for truncated message display
     message_text_short = fields.Char('Content Preview', compute='_compute_message_text_short', store=False)
 
-
     def _get_template_domain(self):
         """Return domain to filter templates based on approval status"""
         return [('status', '=', 'approved')]
     
+    # @api.model
+    def fetch_all_messages(self):
+        """Fetch all messages from LipaChat API and sync with local database"""
+        configs = self.env['lipachat.config'].search([('active', '=', True)])
+        
+        if not configs:
+            raise ValidationError(_("No active LipaChat configuration found."))
+        
+        total_fetched = 0
+        total_new = 0
+        
+        for config in configs:
+            try:
+                fetched, new = self._fetch_messages_for_config(config)
+                total_fetched += fetched
+                total_new += new
+            except Exception as e:
+                _logger.error(f"Failed to fetch messages for config {config.id}: {str(e)}")
+                continue
+        
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Messages Synced'),
+                'message': _('Fetched %d messages, %d new messages added.') % (total_fetched, total_new),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+    
+    def _fetch_messages_for_config(self, config):
+        """Fetch messages for a specific configuration"""
+        if not config.api_key:
+            raise ValidationError(_("API key not configured for %s") % config.name)
+        
+        headers = {
+            'apiKey': config.api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            # Fetch messages from API
+            response = requests.get(
+                f"{config.api_base_url}/whatsapp/message",
+                headers=headers,
+                timeout=30
+            )
+            
+            if response.status_code != 200:
+                raise ValidationError(_("Failed to fetch messages: HTTP %d") % response.status_code)
+            
+            response_data = response.json()
+            
+            if response_data.get('status') != 'success':
+                raise ValidationError(_("API Error: %s") % response_data.get('message', 'Unknown error'))
+            
+            messages = response_data.get('data', [])
+            if not isinstance(messages, list):
+                messages = [messages] if messages else []
+            
+            return self._process_fetched_messages(messages, config)
+            
+        except requests.exceptions.RequestException as e:
+            raise ValidationError(_("Network error while fetching messages: %s") % str(e))
+    
+    def _process_fetched_messages(self, messages, config):
+        """Process and store fetched messages"""
+        fetched_count = len(messages)
+        new_count = 0
+        
+        for msg_data in messages:
+            try:
+                # Check if message already exists
+                existing_msg = self.search([
+                    ('incoming_message_id', '=', msg_data.get('id')),
+                    ('config_id', '=', config.id)
+                ], limit=1)
+                
+                if existing_msg:
+                    # Update existing message status if needed
+                    self._update_existing_message(existing_msg, msg_data)
+                else:
+                    # Create new message record
+                    self._create_message_from_api_data(msg_data, config)
+                    new_count += 1
+                    
+            except Exception as e:
+                _logger.error(f"Error processing message {msg_data.get('id', 'unknown')}: {str(e)}")
+                continue
+        
+        return fetched_count, new_count
+    
+    def _create_message_from_api_data(self, msg_data, config):
+        """Create a new message record from API data"""
+        # Determine if it's incoming or outgoing
+        is_incoming = msg_data.get('direction') == 'incoming' or msg_data.get('from') != config.default_from_number
+        
+        # Find or create contact
+        partner_id = False
+        phone_number = msg_data.get('from') if is_incoming else msg_data.get('to')
+        
+        if phone_number:
+            phone_clean = self._clean_phone_number(phone_number)
+            partner = self._find_or_create_partner(phone_clean)
+            if partner:
+                partner_id = partner.id
+        
+        # Determine message type and content
+        message_type = 'text'
+        message_text = ''
+        media_type = False
+        media_url = False
+        caption = False
+        
+        if msg_data.get('type') == 'text':
+            message_type = 'text'
+            message_text = msg_data.get('text', {}).get('body', '') if isinstance(msg_data.get('text'), dict) else str(msg_data.get('text', ''))
+        elif msg_data.get('type') in ['image', 'video', 'document', 'audio']:
+            message_type = 'media'
+            media_type = msg_data.get('type').upper()
+            media_content = msg_data.get(msg_data.get('type'), {})
+            media_url = media_content.get('link') or media_content.get('url')
+            caption = media_content.get('caption', '')
+            message_text = caption
+        
+        # Determine status
+        state = 'received' if is_incoming else self._map_api_status_to_state(msg_data.get('status'))
+        
+        # Parse timestamp
+        received_at = self._parse_timestamp(msg_data.get('timestamp'))
+        
+        vals = {
+            'incoming_message_id': msg_data.get('id'),
+            'message_id': msg_data.get('id') or str(uuid.uuid4()),
+            'partner_id': partner_id,
+            'phone_number': phone_number,
+            'config_id': config.id,
+            'message_type': message_type,
+            'message_text': message_text,
+            'media_type': media_type,
+            'media_url': media_url,
+            'caption': caption,
+            'state': state,
+            'is_incoming': is_incoming,
+            'received_at': received_at,
+            'response_data': json.dumps(msg_data),
+        }
+        
+        return self.create(vals)
+    
+    def _update_existing_message(self, existing_msg, msg_data):
+        """Update existing message with new status information"""
+        new_status = self._map_api_status_to_state(msg_data.get('status'))
+        if existing_msg.state != new_status:
+            existing_msg.write({
+                'state': new_status,
+                'response_data': json.dumps(msg_data),
+            })
+    
+    def _map_api_status_to_state(self, api_status):
+        """Map API status to internal state"""
+        status_mapping = {
+            'sent': 'sent',
+            'delivered': 'delivered',
+            'read': 'read',
+            'failed': 'failed',
+            'pending': 'draft',
+        }
+        return status_mapping.get(api_status, 'draft')
+    
+    def _parse_timestamp(self, timestamp):
+        """Parse timestamp from API response"""
+        if not timestamp:
+            return fields.Datetime.now()
+        
+        try:
+            # Handle different timestamp formats
+            if isinstance(timestamp, (int, float)):
+                return datetime.fromtimestamp(timestamp)
+            elif isinstance(timestamp, str):
+                # Try different datetime formats
+                for fmt in ['%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S']:
+                    try:
+                        return datetime.strptime(timestamp, fmt)
+                    except ValueError:
+                        continue
+        except Exception as e:
+            _logger.warning(f"Failed to parse timestamp {timestamp}: {str(e)}")
+        
+        return fields.Datetime.now()
+    
+    def _find_or_create_partner(self, phone_number):
+        """Find existing partner by phone or create a new one"""
+        if not phone_number:
+            return False
+        
+        # Search for existing partner
+        partner = self.env['res.partner'].search([
+            '|',
+            ('phone', 'ilike', phone_number),
+            ('mobile', 'ilike', phone_number)
+        ], limit=1)
+        
+        if partner:
+            return partner
+        
+        # Create new partner
+        try:
+            partner = self.env['res.partner'].create({
+                'name': f"WhatsApp Contact {phone_number}",
+                'mobile': phone_number,
+                'is_company': False,
+                'category_id': [(4, self._get_whatsapp_category_id())],
+            })
+            return partner
+        except Exception as e:
+            _logger.error(f"Failed to create partner for {phone_number}: {str(e)}")
+            return False
+    
+    def _get_whatsapp_category_id(self):
+        """Get or create WhatsApp contact category"""
+        category = self.env['res.partner.category'].search([('name', '=', 'WhatsApp Contact')], limit=1)
+        if not category:
+            category = self.env['res.partner.category'].create({
+                'name': 'WhatsApp Contact',
+                'color': 10,  # Green color
+            })
+        return category.id
 
     @api.onchange('partner_id')
     def _onchange_partner_id(self):
@@ -111,7 +339,6 @@ class LipachatMessage(models.Model):
                 record.view_phone_number = False
                 record.phone_number = False
 
-
     @api.depends('template_name')
     def _compute_template_variables(self):
         for record in self:
@@ -122,7 +349,6 @@ class LipachatMessage(models.Model):
             else:
                 record.template_variables = '[]'
 
-    
     def _prepare_template_components(self):
         """Prepare the components dictionary for template messages"""
         components = {}
@@ -190,18 +416,12 @@ class LipachatMessage(models.Model):
                 _logger.error(f"Error computing message_text_short: {str(e)}")
                 record.message_text_short = ''
 
-
-
     @api.constrains('partner_id', 'phone_number')
     def _check_recipients(self):
         for record in self:
             if not record.partner_id and not record.phone_number:
                 raise ValidationError(_("You must specify either a contact or a phone number"))
-            # if record.partner_id and record.phone_number:
-            #     raise ValidationError(_("Please specify only one recipient - either a contact or a phone number"))
-            
-
-            
+    
     @api.constrains('message_type', 'message_text')
     def _check_message_content(self):
         for record in self:
@@ -218,7 +438,6 @@ class LipachatMessage(models.Model):
         if cleaned.startswith('0'):
             cleaned = cleaned[1:]
         return cleaned
-
 
     def send_message(self):
         """Send WhatsApp message via LipaChat API to one contact"""
@@ -248,7 +467,6 @@ class LipachatMessage(models.Model):
             raise ValidationError(_("No valid recipient found. Please check phone number."))
         
         return self._send_single_message(recipient, config)
-    
 
     def _send_bulk_messages(self, recipients, config):
         """Create individual message records for each recipient and send them"""
@@ -274,7 +492,6 @@ class LipachatMessage(models.Model):
             # Create individual message record
             individual_msg = self.copy({
                 'partner_id': recipient['partner_id'],
-                # 'partner_ids': [(5, 0, 0)],  # Clear many2many field
                 'phone_number': recipient['phone'],
                 'is_bulk_template': False,
                 'bulk_parent_id': self.id,
@@ -313,7 +530,6 @@ class LipachatMessage(models.Model):
         self.failed_contacts = '\n'.join(failed_contacts) if failed_contacts else ''
         
         return True
-
 
     def _send_single_message(self, recipient, config):
         """Send message to a single recipient with session validation"""
@@ -460,7 +676,6 @@ class LipachatMessage(models.Model):
         )
         
         return self._handle_response(response)
-    
 
     def _send_template_message(self, config, headers, recipient):
         components = self._prepare_template_components()
@@ -496,8 +711,6 @@ class LipachatMessage(models.Model):
         
         return self._handle_response(response)
     
-    
-    
     def _handle_response(self, response):
         """Handle API response and update message status accordingly"""
         try:
@@ -529,7 +742,6 @@ class LipachatMessage(models.Model):
             error_msg = f"Invalid JSON response: {response.text}"
             _logger.error(error_msg)
             raise ValidationError(error_msg)
-        
 
     # Add to LipachatMessage class
     @api.onchange('message_type')

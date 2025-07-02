@@ -55,7 +55,6 @@
         'lipachat_odoo_ex/static/src/css/whatsapp_template.css',
         'lipachat_odoo_ex/static/src/js/whatsapp_chat_client.js',
         'lipachat_odoo_ex/static/src/js/lipachat_template_client.js',
-        'lipachat_odoo_ex/static/src/js/menu_reload.js',
     ],
    },
 }
