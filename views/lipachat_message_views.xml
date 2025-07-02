@@ -184,8 +184,10 @@
                     <field name="create_date" string="Created on"/>
                     <field name="partner_id" string="Contact"/>
                     <field name="phone_number" string="Phone Number"/>
-                    <field name="direction" string="Direction"/>
                     <field name="message_type" string="Message Type"/>
+                    <field name="direction" string="Direction" 
+                        decoration-info="direction=='inbound'"
+                        decoration-success="direction=='outbound'"/>
                     <field name="message_text_short" string="Content"/>
                     <field name="state" string="Status"/>
                 </tree>
