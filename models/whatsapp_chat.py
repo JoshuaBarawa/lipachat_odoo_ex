@@ -678,7 +678,7 @@ class WhatsappChat(models.TransientModel):
         }.get(msg_data['state'], '○')
         is_sent_by_me = (msg_data['state'] in ['SENT', 'READ', 'DELIVERED', 'FAILED', 'DRAFT']) 
         bubble_align = 'margin-left: auto;' if is_sent_by_me else 'margin-right: auto;'
-        bubble_background = '#d9fdd3' if is_sent_by_me else '#ffffff'
+        bubble_background = '#d9fdd3' if is_sent_by_me else '#fff'
 
         content = "Unsupported Message Type"
         if msg_data['message_type'] == 'text':
@@ -709,7 +709,7 @@ class WhatsappChat(models.TransientModel):
         
         return f'''
         <div class="message-bubble" 
-            style="background: {bubble_background}; font-size: 13px; max-width: 55%; min-width: 300px; padding: 4px 12px; line-height: 1.4; position: relative; margin: 8px 0; border-radius: 7.5px; position: relative; {bubble_align} box-shadow: 0 1px 0.5px rgba(0,0,0,0.1);">
+            style="background: {bubble_background}; font-size: 13px; max-width: 55%; min-width: 300px; padding: 4px 12px; line-height: 1.4; position: relative; margin: 8px 0; border-radius: 7.5px; position: relative; {bubble_align}">
             <div style="">
                 <strong style="color: {status_color};">{'You' if is_sent_by_me else contact_name}</strong>
                 <small style="color: #666; float: right; font-size: 12px;">{msg_date_display}</small>
