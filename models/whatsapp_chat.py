@@ -231,7 +231,7 @@ class WhatsappChat(models.TransientModel):
                     "media_type": template.header_type,
                     "template_media_url": media_url,
                     "template_placeholders": placeholders,
-                    'state': 'sent'
+                    'state': 'SENT'
                 })
 
                 # Only start new session if one doesn't already exist
@@ -538,7 +538,7 @@ class WhatsappChat(models.TransientModel):
             
             # Only include messages with status 'sent'
             messages = self.env['lipachat.message'].search([
-                ('state', '=', 'sent'), 
+                  ('state', 'not in', ['FAILED', 'DRAFT']),
                 ('is_bulk_template', '=', False),
                 ('partner_id', '!=', False)
             ])
@@ -661,22 +661,22 @@ class WhatsappChat(models.TransientModel):
         This allows both compute methods and RPC methods to use it.
         """
         status_color = {
-            'sent': '#25D366',
-            'delivered': '#34B7F1', 
-            'failed': '#dc3545',
-            'draft': '#6c757d',
-            'received': '#A9A9A9' 
+            'SENT': '#25D366',
+            'READ': '#34B7F1', 
+            'FAILED': '#dc3545',
+            'DRAFT': '#6c757d',
+            'RECEIVED': '#A9A9A9' 
         }.get(msg_data['state'], '#6c757d')
         
         status_icon = {
-            'sent': '✓',
-            'delivered': '✓✓',
-            'failed': '✗',
-            'draft': '○',
-            'received': '←' 
+            'SENT': '✓',
+            'DELIVERED': '✓✓',
+            'READ': '✓✓',
+            'FAILED': '✗',
+            'DRAFT': '○',
+            'RECEIVED': '←' 
         }.get(msg_data['state'], '○')
-
-        is_sent_by_me = (msg_data['state'] in ['sent', 'delivered', 'failed', 'draft']) 
+        is_sent_by_me = (msg_data['state'] in ['SENT', 'READ', 'DELIVERED', 'FAILED', 'DRAFT']) 
         bubble_align = 'margin-left: auto;' if is_sent_by_me else 'margin-right: auto;'
         bubble_background = '#d9fdd3' if is_sent_by_me else '#ffffff'
 
@@ -733,7 +733,7 @@ class WhatsappChat(models.TransientModel):
         domain = [
             ('partner_id', '=', partner_id),
             ('is_bulk_template', '=', False),
-            ('state', '=', 'sent')  # Only include sent messages
+            ('state', 'not in', ['FAILED', 'DRAFT']),  # Only include sent messages
         ]
         if last_message_id:
             domain.append(('id', '>', last_message_id))
@@ -797,7 +797,7 @@ class WhatsappChat(models.TransientModel):
                 'config_id': config.id,
                 'message_type': 'text',
                 'message_text': self.new_message.strip(),
-                'state': 'draft'
+                'state': 'DRAFT'
             })
             
             message.send_message()
@@ -843,7 +843,7 @@ class WhatsappChat(models.TransientModel):
                 'config_id': config.id,
                 'message_type': 'text',
                 'message_text': message_text.strip(),
-                'state': 'draft'
+                'state': 'DRAFT'
             })
             
             message.send_message()
@@ -903,7 +903,7 @@ class WhatsappChat(models.TransientModel):
         """
         # Only include messages with status 'sent'
         messages = self.env['lipachat.message'].search([
-            ('state', '=', 'sent'), 
+            ('state', 'not in', ['FAILED', 'DRAFT']),
             ('is_bulk_template', '=', False),
             ('partner_id', '!=', False)
         ])
@@ -975,7 +975,7 @@ class WhatsappChat(models.TransientModel):
         New RPC method to immediately get the most recent contact for faster initialization
         """
         most_recent_message = self.env['lipachat.message'].search([
-            ('state', '=', 'sent'),  # Only include sent messages
+            ('state', 'not in', ['FAILED', 'DRAFT']),
             ('is_bulk_template', '=', False),
             ('partner_id', '!=', False)
         ], order='create_date desc', limit=1)
