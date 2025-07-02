@@ -138,61 +138,77 @@ class LipachatMessage(models.Model):
         
         headers = {
             'apiKey': config.api_key,
+            'Content-Type': 'application/json'
         }
 
-        _logger.info(f"API Request header: {headers}")
-        
         try:
             # Initialize variables
             all_messages = []
             page = 0
-            total_pages = 1  # Will be updated from response
+            total_pages = 1  # Will be updated from first response
+            page_size = 100  # Maximum page size to reduce number of requests
             
-            # Fetch all pages
+            # First request to get total pages without parameters
+            initial_response = requests.get(
+                f"{config.api_base_url}/whatsapp/message",
+                headers=headers,
+                timeout=30
+            )
+            
+            if initial_response.status_code != 200:
+                raise ValidationError(_("Failed to fetch messages: HTTP %d - %s") % 
+                                    (initial_response.status_code, initial_response.text))
+            
+            try:
+                initial_data = initial_response.json()
+                total_pages = initial_data.get('totalPages', 1)
+                _logger.info(f"Total pages to fetch: {total_pages}")
+            except ValueError as e:
+                _logger.error(f"Invalid JSON response: {initial_response.text}")
+                raise ValidationError(_("Invalid API response format"))
+            
+            # Now fetch all pages with pagination
             while page < total_pages:
-                # Add pagination parameters
                 params = {
                     'page': page,
-                    'size': 10  # Adjust page size as needed
+                    'size': page_size
                 }
                 
                 response = requests.get(
                     f"{config.api_base_url}/whatsapp/message",
                     headers=headers,
-                    # params=params,
+                    params=params,
                     timeout=30
                 )
                 
-                # Log the raw response for debugging
-                _logger.info(f"API Response Status: {response}")
-                _logger.info(f"API Response Status: {response.status_code}")
-                _logger.debug(f"API Response Content: {response.text}")
+                _logger.info(f"Fetching page {page + 1}/{total_pages} with size {page_size}")
                 
-                # if response.status_code != 200:
-                #     raise ValidationError(_("Failed to fetch messages: HTTP %d - %s") % 
-                #                         (response.status_code, response.text))
+                if response.status_code != 200:
+                    _logger.error(f"Failed to fetch page {page}: HTTP {response.status_code}")
+                    page += 1
+                    continue  # Skip to next page instead of failing completely
                 
                 try:
                     response_data = response.json()
+                    messages = response_data.get('data', [])
+                    
+                    if messages:
+                        all_messages.extend(messages)
+                        _logger.info(f"Fetched {len(messages)} messages from page {page + 1}")
+                    
+                    # Update total pages in case it changed
+                    current_total = response_data.get('totalPages', total_pages)
+                    if current_total != total_pages:
+                        _logger.info(f"Total pages updated from {total_pages} to {current_total}")
+                        total_pages = current_total
+                    
                 except ValueError as e:
-                    _logger.error(f"Invalid JSON response: {response.text}")
-                    raise ValidationError(_("Invalid API response format"))
+                    _logger.error(f"Invalid JSON in page {page}: {response.text}")
+                    page += 1
+                    continue
                 
-                # Check if response has the expected structure
-                if not isinstance(response_data, dict) or 'data' not in response_data:
-                    _logger.error(f"Unexpected API response structure: {response_data}")
-                    raise ValidationError(_("Unexpected API response format"))
-                
-                # Add messages from this page
-                messages = response_data.get('data', [])
-                if messages:
-                    all_messages.extend(messages)
-                    _logger.info(f"Fetched {len(messages)} messages from page {page}")
-                
-                # Update pagination info
-                total_pages = response_data.get('totalPages', 1)
                 page += 1
-                
+            
             _logger.info(f"Total messages fetched: {len(all_messages)}")
             return self._process_fetched_messages(all_messages, config)
             
