@@ -79,17 +79,17 @@ class LipachatMessage(models.Model):
     
     # Status fields
     state = fields.Selection([
-        ('draft', 'Draft'),
-        ('sent', 'Sent'),
-        ('delivered', 'Delivered'),
-        ('read', 'Read'),
-        ('failed', 'Failed'),
-        ('received', 'Received'),  # For incoming messages
-    ], 'Status', default='draft')
+        ('DRAFT', 'DRAFT'),
+        ('SENT', 'SENT'),
+        ('DELIVERED', 'DELIVERED'),
+        ('READ', 'READ'),
+        ('FAILED', 'FAILED'),
+        ('RECEIVED', 'RECEIVED'),
+    ], string='Status', default='DRAFT')
 
     direction = fields.Selection([
-    ('inbound', 'Inbound'),
-    ('outbound', 'Outbound')
+    ('INBOUND', 'INBOUND'),
+    ('OUTBOUND', 'OUTBOUND')
     ], string='Direction', compute='_compute_direction', store=True)
     
     error_message = fields.Text('Error Message')
@@ -103,7 +103,7 @@ class LipachatMessage(models.Model):
     @api.depends('is_incoming')
     def _compute_direction(self):
         for record in self:
-            record.direction = 'inbound' if record.is_incoming else 'outbound'
+            record.direction = 'INBOUND' if record.is_incoming else 'OUTBOUND'
 
 
     def _get_template_domain(self):
@@ -309,13 +309,18 @@ class LipachatMessage(models.Model):
             
             # Map status
             api_status = msg_data.get('status', '').upper()
+            if is_incoming and not api_status:
+                api_status = 'RECEIVED'
+
             status_mapping = {
-                'READ': 'read',
-                'DELIVERED': 'delivered',
-                'SENT': 'sent',
-                'FAILED': 'failed',
+                'READ': 'READ',
+                'DELIVERED': 'DELIVERED',
+                'SENT': 'SENT',
+                'FAILED': 'FAILED',
+                'RECEIVED': 'RECEIVED',
             }
-            state = status_mapping.get(api_status, 'received' if is_incoming else 'sent')
+            state = status_mapping.get(api_status, 'RECEIVED' if is_incoming else 'SENT')
+        
             
             # Parse timestamps
             created_at = self._parse_timestamp(msg_data.get('createdAt'))
@@ -334,7 +339,7 @@ class LipachatMessage(models.Model):
                 'caption': caption,
                 'state': state,
                 'is_incoming': is_incoming,
-                'direction': 'inbound' if is_incoming else 'outbound',
+                'direction': 'INBOUND' if is_incoming else 'OUTBOUND',
                 'received_at': created_at,
                 'create_date': created_at,
                 'write_date': updated_at,
@@ -365,13 +370,15 @@ class LipachatMessage(models.Model):
         
         api_status = api_status.lower()
         status_mapping = {
-            'read': 'read',
-            'delivered': 'delivered',
-            'sent': 'sent',
-            'failed': 'failed',
-            'pending': 'draft',
+            'read': 'READ',
+            'delivered': 'DELIVERED',
+            'sent': 'SENT',
+            'failed': 'FAILED',
+            'received': 'RECEIVED',
+            'pending': 'DRAFT',
         }
-        return status_mapping.get(api_status, 'draft')
+        return status_mapping.get(api_status, 'RECEIVED' if self.is_incoming else 'SENT')
+    
     
     def _parse_timestamp(self, timestamp):
         """Parse timestamp from API response"""

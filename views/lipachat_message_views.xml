@@ -58,7 +58,7 @@
                 <form string="WhatsApp Message" class="lipachat-message-form">
                     <header>
                         <button name="send_message" string="Send Message" type="object" class="btn-primary" 
-                                invisible="state != 'draft'"/>
+                                invisible="state != 'DRAFT'"/>
                         <button name="fetch_all_messages" string="Sync Messages" type="object" class="oe_highlight"/>
                         <field name="state" widget="statusbar"/>
                     </header>
@@ -86,12 +86,12 @@
                                 <field name="partner_id" 
                                     placeholder="Select a contact..."
                                     options="{'no_create': True}"
-                                    readonly="state != 'draft'"/>
+                                    readonly="state != 'DRAFT'"/>
 
                                  <field name="view_phone_number" 
                                     readonly="1"
                                     string="Contact Phone"
-                                    invisible="not partner_id or state != 'draft'"
+                                    invisible="not partner_id or state != 'DRAFT'"
                                     optional="hide"/>
                             </group>
                          </group>
@@ -101,10 +101,10 @@
                             <group>
                                 <!-- New config selection -->
                                 <field name="config_id" domain="[('active', '=', True)]" 
-                                       readonly="state != 'draft'"/>
+                                       readonly="state != 'DRAFT'"/>
                                 <!-- from_number is now readonly and related to config -->
                                 <field name="from_number" readonly="1"/>
-                                <field name="message_type" readonly="state != 'draft'"/>
+                                <field name="message_type" readonly="state != 'DRAFT'"/>
                             </group>
                             <group>
                                 <field name="message_id" invisible="1"/>
@@ -123,25 +123,25 @@
                                   <!-- Text Message Section -->
                                 <div class="o_group" string="Text Message" invisible="message_type != 'text'" style="width: 100%; max-width: 100%;">
                                     <field name="message_text" nolabel="1" placeholder="Enter your message text" 
-                                           style="width: 100%; max-width: 100%;" readonly="state != 'draft'"/>
+                                           style="width: 100%; max-width: 100%;" readonly="state != 'DRAFT'"/>
                                 </div>
 
                                 <!-- Media Message Section -->
                                 <group string="Media Message" invisible="message_type != 'media'">
-                                    <field name="media_type" readonly="state != 'draft'"/>
-                                    <field name="media_url" readonly="state != 'draft'"/>
-                                    <field name="caption" readonly="state != 'draft'"/>
+                                    <field name="media_type" readonly="state != 'DRAFT'"/>
+                                    <field name="media_url" readonly="state != 'DRAFT'"/>
+                                    <field name="caption" readonly="state != 'DRAFT'"/>
                                 </group>
                                 
                                 <!-- Template Message Section -->
                                 <group string="Template Message" invisible="message_type != 'template'">
                                     <field name="template_name" placeholder="Select a template..."
-                                        readonly="state != 'draft'"/>
+                                        readonly="state != 'DRAFT'"/>
 
                                     <!-- Media URL field (only shown if template has media) -->
                                     <field name="template_media_url" 
                                         invisible="template_name == False"
-                                        readonly="state != 'draft'"/>
+                                        readonly="state != 'DRAFT'"/>
 
                                      <field name="template_variables" invisible="1"/>
 
@@ -151,7 +151,7 @@
                                         widget="char" 
                                         placeholder="Enter values for template variables as JSON (e.g., {'name': 'John', 'company': 'ABC Corp'})"
                                         invisible="template_variables == '[]'"
-                                        readonly="state != 'draft'"/>
+                                        readonly="state != 'DRAFT'"/>
 
                                 </group>
 
@@ -178,18 +178,20 @@
             <field name="model">lipachat.message</field>
             <field name="arch" type="xml">
                 <tree string="WhatsApp Messages" 
-                    decoration-success="state=='sent'" 
-                    decoration-danger="state=='failed'" 
+                    decoration-info="state=='SENT'" 
+                    decoration-success="state=='READ'" 
+                    decoration-danger="state=='FAILED'" 
                     decoration-warning="state=='partially_sent'">
                     <field name="create_date" string="Created on"/>
                     <field name="partner_id" string="Contact"/>
                     <field name="phone_number" string="Phone Number"/>
                     <field name="message_type" string="Message Type"/>
                     <field name="direction" string="Direction" 
-                        decoration-info="direction=='inbound'"
-                        decoration-success="direction=='outbound'"/>
+                        decoration-info="direction=='INBOUND'"
+                        decoration-success="direction=='OUTBOUND'"/>
                     <field name="message_text_short" string="Content"/>
-                    <field name="state" string="Status"/>
+                    <field name="state" string="Status"
+                        decoration-info="state=='RECEIVED'"/>
                 </tree>
             </field>
         </record>
@@ -205,11 +207,11 @@
                     <field name="message_text"/>
                     <field name="state"/>
                     <field name="direction"/>
-                    <filter string="Inbound" name="inbound" domain="[('direction', '=', 'inbound')]"/>
-                    <filter string="Outbound" name="outbound" domain="[('direction', '=', 'outbound')]"/>
-                    <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
-                    <filter string="Sent" name="sent" domain="[('state', '=', 'sent')]"/>
-                    <filter string="Failed" name="failed" domain="[('state', '=', 'failed')]"/>
+                    <filter string="INBOUND" name="INBOUND" domain="[('direction', '=', 'INBOUND')]"/>
+                    <filter string="OUTBOUND" name="OUTBOUND" domain="[('direction', '=', 'OUTBOUND')]"/>
+                    <filter string="DRAFT" name="DRAFT" domain="[('state', '=', 'DRAFT')]"/>
+                    <filter string="SENT" name="SENT" domain="[('state', '=', 'SENT')]"/>
+                    <filter string="FAILED" name="FAILED" domain="[('state', '=', 'FAILED')]"/>
                     
                     <separator/>
                     <filter string="Today" name="today" 
