@@ -86,6 +86,11 @@ class LipachatMessage(models.Model):
         ('failed', 'Failed'),
         ('received', 'Received'),  # For incoming messages
     ], 'Status', default='draft')
+
+    direction = fields.Selection([
+    ('inbound', 'Inbound'),
+    ('outbound', 'Outbound')
+    ], string='Direction', compute='_compute_direction', store=True)
     
     error_message = fields.Text('Error Message')
     response_data = fields.Text('API Response')
@@ -94,6 +99,12 @@ class LipachatMessage(models.Model):
     
     # Computed field for truncated message display
     message_text_short = fields.Char('Content Preview', compute='_compute_message_text_short', store=False)
+
+    @api.depends('is_incoming')
+    def _compute_direction(self):
+        for record in self:
+            record.direction = 'inbound' if record.is_incoming else 'outbound'
+
 
     def _get_template_domain(self):
         """Return domain to filter templates based on approval status"""
@@ -323,6 +334,7 @@ class LipachatMessage(models.Model):
                 'caption': caption,
                 'state': state,
                 'is_incoming': is_incoming,
+                'direction': 'inbound' if is_incoming else 'outbound',
                 'received_at': created_at,
                 'create_date': created_at,
                 'write_date': updated_at,

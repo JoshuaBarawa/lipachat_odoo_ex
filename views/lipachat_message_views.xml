@@ -113,6 +113,7 @@
                                 <!-- Hidden fields for internal use -->
                                 <field name="partner_id" invisible="1"/>
                                 <field name="phone_number" invisible="1"/>
+                                <!-- <field name="direction" invisible="1" readonly="1"/> -->
                             </group>
                         </group>
 
@@ -177,18 +178,16 @@
             <field name="model">lipachat.message</field>
             <field name="arch" type="xml">
                 <tree string="WhatsApp Messages" 
-                      decoration-success="state=='sent'" 
-                      decoration-danger="state=='failed'" 
-                      decoration-warning="state=='partially_sent'">
+                    decoration-success="state=='sent'" 
+                    decoration-danger="state=='failed'" 
+                    decoration-warning="state=='partially_sent'">
                     <field name="create_date" string="Created on"/>
                     <field name="partner_id" string="Contact"/>
                     <field name="phone_number" string="Phone Number"/>
+                    <field name="direction" string="Direction"/>
                     <field name="message_type" string="Message Type"/>
                     <field name="message_text_short" string="Content"/>
                     <field name="state" string="Status"/>
-                    <!-- <field name="fail_reason" string="Fail Reason"/> -->
-                    <!-- <field name="bulk_parent_id" invisible="1"/>
-                    <field name="is_bulk_template" invisible="1"/> -->
                 </tree>
             </field>
         </record>
@@ -203,6 +202,9 @@
                     <field name="phone_number"/>
                     <field name="message_text"/>
                     <field name="state"/>
+                    <field name="direction"/>
+                    <filter string="Inbound" name="inbound" domain="[('direction', '=', 'inbound')]"/>
+                    <filter string="Outbound" name="outbound" domain="[('direction', '=', 'outbound')]"/>
                     <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                     <filter string="Sent" name="sent" domain="[('state', '=', 'sent')]"/>
                     <filter string="Failed" name="failed" domain="[('state', '=', 'failed')]"/>
@@ -215,6 +217,7 @@
                     
                     <group expand="0" string="Group By">
                         <filter string="Status" name="group_status" context="{'group_by': 'state'}"/>
+                        <filter string="Direction" name="group_direction" context="{'group_by': 'direction'}"/>
                         <filter string="Message Type" name="group_type" context="{'group_by': 'message_type'}"/>
                         <filter string="Contact" name="group_contact" context="{'group_by': 'partner_id'}"/>
                         <filter string="Date" name="group_date" context="{'group_by': 'create_date:day'}"/>
