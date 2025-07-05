@@ -692,45 +692,30 @@ class LipachatMessage(models.Model):
         }
         
         try:
-            partner_id = recipient.get('partner_id')
-            session_active = False
-            
-            # Check session status if we have a partner_id
-            if partner_id:
-                whatsapp_chat = self.env['whatsapp.chat']
-                session_info = whatsapp_chat.rpc_get_session_info(partner_id)
-                session_active = session_info.get('active', False)
-                
-                # Block non-template messages if no active session
-                if not session_active and self.message_type != 'template':
-                    fail_reason = _(
-                        "No active session. Send a template message first to start a session."
-                    )
-                    self.write({
-                        'state': 'FAILED',
-                        'error_message': fail_reason,
-                        'fail_reason': fail_reason
-                    })
-                    return False
-            
             # Send the message
             send_method = getattr(self, f'_send_{self.message_type}_message')
-            if send_method(config, headers, recipient):
+            result = send_method(config, headers, recipient)
+            if isinstance(result, dict):
+                if 'notification' in result:
+                    # Show the notification to the user
+                    return result['notification']
+                
+                if result.get('status', False):
+                    self.state = 'SENT'
+                    self.sent_contacts = f"{recipient['name']} ({recipient['phone']})"
+                    return True
+                else:
+                    return False
+                
+            if result:
                 self.state = 'SENT'
                 self.sent_contacts = f"{recipient['name']} ({recipient['phone']})"
-                
-                # Start new session only if:
-                # 1. We have a partner_id
-                # 2. It's a template message
-                # 3. No active session exists
-                if partner_id and self.message_type == 'template' and not session_active:
-                    session_started = whatsapp_chat.start_session_tracking(partner_id)
-                    _logger.info(f"New session started for partner {partner_id}")
-                elif session_active:
-                    _logger.info(f"Using existing active session for partner {partner_id}")
-                
                 return True
+            
             else:
+                if self.state == 'DRAFT':
+                    return False  # Already handled in _handle_response
+                
                 fail_reason = "Unexpected API response status"
                 self.write({
                     'state': 'FAILED',
@@ -748,6 +733,8 @@ class LipachatMessage(models.Model):
                 'fail_reason': fail_reason
             })
             return False
+        
+
     
     def _send_text_message(self, config, headers, recipient):
         data = {
@@ -865,6 +852,30 @@ class LipachatMessage(models.Model):
         """Handle API response and update message status accordingly"""
         try:
             response_data = response.json()
+        
+            # Check for the specific sandbox session error
+            if (response_data.get('status') == 'error' and 
+                "24-hour sandbox session window" in response_data.get('message', '')):
+                error_msg = response_data.get('message')
+                _logger.warning(f"Session window error: {error_msg}")
+                # Show notification to user without marking as failed
+
+                self.state = 'DRAFT'
+                self.response_data = json.dumps(response_data)
+                return {
+                'notification': {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': _("Contact Session Expired"),
+                        'message': error_msg,
+                        'type': 'warning',
+                        'sticky': True,
+                    }
+                },
+                'status': False
+            }
+            
             
             # Check for successful status codes (2xx range)
             if response.status_code // 100 != 2:
