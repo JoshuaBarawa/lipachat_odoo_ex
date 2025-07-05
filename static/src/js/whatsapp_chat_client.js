@@ -15,12 +15,21 @@
             this.eventListeners = [];
             this.initPromise = null; // Track initialization promise
             this.sessionTimer = null;
-            this.sessionInfo = {};
+            this.sessionInfo ={};
             this.sessionTimerInterval = null;
             this.sessionEndCallback = null;
             this.currentUrl = window.location.href;
             this.urlCheckInterval = null;
             this.mutationObserver = null;
+
+            this.lastSessionState = null;
+            this.lastUIState = null;
+            this.lastContactsState = null;
+            this.isUpdatingUI = false;
+            this.sessionCheckInProgress = false;
+            this.forceContactReselection = false;
+            this.debouncedUpdateInputFields = this.debounce(this.updateInputFields.bind(this), 100);
+
         }
 
         addEventListener(element, event, handler) {
@@ -118,11 +127,37 @@
             }
         }
 
+        async getSessionInfo(partnerId) {
+            if (this.sessionCheckInProgress) {
+                return this.lastSessionState; // Return cached state if check in progress
+            }
+    
+            this.sessionCheckInProgress = true;
+            try {
+                const partner = await this.getPartnerDetails(partnerId);
+                const sessionInfo = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'check_contact_active_session',
+                    [partner.mobile || partner.phone, partner.mobile || partner.phone]
+                );
+                
+                this.lastSessionState = sessionInfo;
+                return sessionInfo;
+            } finally {
+                this.sessionCheckInProgress = false;
+            }
+        }
+
         async selectContact(partnerId, contactName) {
             try {
                 partnerId = parseInt(partnerId);
                 if (isNaN(partnerId)) {
                     console.error('Invalid partner ID:', partnerId);
+                    return;
+                }
+                
+                // Don't re-select if already selected (prevents flickering during auto-refresh)
+                if (this.currentSelectedPartnerId === partnerId && !this.forceContactReselection) {
                     return;
                 }
                 
@@ -133,18 +168,11 @@
                 this.updateContactSelectionUI(partnerId);
                 this.updateChatHeader(this.currentSelectedContactName);
                 this.updateOdooFields(partnerId, this.currentSelectedContactName);
-
-                // First check session status via API
-                const partner = await this.getPartnerDetails(partnerId);
-
-                const sessionInfo = await this.makeRpcCall(
-                    'whatsapp.chat',
-                    'check_contact_active_session',
-                    [partner.mobile || partner.phone, partner.mobile || partner.phone]
-                );
-                
+    
+                // Get session info using unified method
+                const sessionInfo = await this.getSessionInfo(partnerId);
                 this.updateInputFields(sessionInfo, partnerId);
-
+    
                 // Start session timer if active
                 if (sessionInfo.session_active && sessionInfo.expires_at) {
                     this.startSessionTimer(sessionInfo.expires_at);
@@ -160,13 +188,6 @@
                 );
                 this.renderMessages(messagesHtml);
                 
-                // if (sessionInfo.active) {
-                //     this.sessionEndCallback = () => {
-                //         this.showChatInfo('Session has expired');
-                //         this.checkSessionStatus(partnerId);
-                //         this.updateInputFields({ active: false }, partnerId); // Update inputs when session expires
-                //     };
-                // }
             } catch (error) {
                 console.error("Error in selectContact:", error);
                 this.renderMessages(`
@@ -177,6 +198,8 @@
             }
         }
 
+
+
         async getPartnerDetails(partnerId) {
             return await this.makeRpcCall(
                 'res.partner',
@@ -185,15 +208,6 @@
             ).then(results => results[0]);
         }
         
-        async getSandboxCode() {
-            const config = await this.makeRpcCall(
-                'lipachat.config',
-                'search_read',
-                [[('active', '=', True)], ['sandbox_join_code']],
-                {'limit': 1}
-            );
-            return config[0]?.sandbox_join_code || '';
-        }
         
 
         updateChatHeader(contactName) {
@@ -353,54 +367,109 @@
 
 
         async updateContactsList() {
-            try {
-                const contactsHtml = await this.makeRpcCall(
-                    'whatsapp.chat',
-                    'rpc_get_contacts_html',
-                    [],
-                    {}
-                );
+        try {
+            const contactsHtml = await this.makeRpcCall(
+                'whatsapp.chat',
+                'rpc_get_contacts_html',
+                [],
+                {}
+            );
+            
+            const contactsContainer = document.querySelector('.chat-contacts .contacts-list') ||
+                                    document.querySelector('.o_whatsapp_contacts_html');
+            if (contactsContainer) {
+                contactsContainer.innerHTML = contactsHtml;
                 
-                const contactsContainer = document.querySelector('.chat-contacts .contacts-list') ||
-                                        document.querySelector('.o_whatsapp_contacts_html');
-                if (contactsContainer) {
-                    contactsContainer.innerHTML = contactsHtml;
-                    
-                    // Check if we have any contacts after update
-                    const hasContacts = contactsContainer.querySelector('.contact-item') !== null;
-                    
-                    if (this.currentSelectedPartnerId) {
-                        this.updateContactSelectionUI(this.currentSelectedPartnerId);
-                    }
-                    
-                    // Update input fields based on new contacts list state
-                    if (this.currentSelectedPartnerId) {
-                        const sessionInfo = await this.checkSessionStatus(this.currentSelectedPartnerId);
-                        this.updateInputFields(sessionInfo, this.currentSelectedPartnerId);
-                    } else {
-                        this.updateInputFields({ active: false }, false);
-                    }
+                // Restore selection UI
+                if (this.currentSelectedPartnerId) {
+                    this.updateContactSelectionUI(this.currentSelectedPartnerId);
                 }
-            } catch (error) {
-                console.error("Error updating contacts list:", error);
-                // Even if error occurs, update input fields to reflect no contacts
-                this.updateInputFields({ active: false }, false);
+                
+                // Only update input fields if no contact is selected or if contacts list state changed
+                const hasContacts = contactsContainer.querySelector('.contact-item') !== null;
+                const contactsStateChanged = this.lastContactsState !== hasContacts;
+                this.lastContactsState = hasContacts;
+                
+                if (!this.currentSelectedPartnerId || contactsStateChanged) {
+                    this.updateInputFields({ session_active: false }, this.currentSelectedPartnerId);
+                }
             }
+        } catch (error) {
+            console.error("Error updating contacts list:", error);
         }
+    }
+
+
+
 
         startAutoRefresh() {
             if (this.autoRefreshInterval) {
                 clearInterval(this.autoRefreshInterval);
             }
+    
             this.autoRefreshInterval = setInterval(async () => {
-                if (document.visibilityState === 'visible') { 
-                    if (this.currentSelectedPartnerId) {
-                        await this.selectContact(this.currentSelectedPartnerId, this.currentSelectedContactName);
+                if (document.visibilityState === 'visible') {
+                    try {
+                        // Update contacts list first
+                        await this.updateContactsList();
+                        
+                        // Only refresh messages for selected contact, don't re-select
+                        if (this.currentSelectedPartnerId) {
+                            await this.refreshMessagesOnly(this.currentSelectedPartnerId);
+                        }
+                    } catch (error) {
+                        console.error("Error during auto-refresh:", error);
                     }
-                    await this.updateContactsList();
                 }
             }, 10000);
         }
+
+
+        async refreshMessagesOnly(partnerId) {
+            try {
+                // Get fresh messages
+                const messagesHtml = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'rpc_get_messages_html',
+                    [partnerId]
+                );
+                
+                // Only update messages, don't touch input fields
+                this.renderMessages(messagesHtml);
+                
+                // Check session status separately and only update if changed
+                const sessionInfo = await this.getSessionInfo(partnerId);
+                if (sessionInfo && this.hasSessionStateChanged(sessionInfo)) {
+                    this.updateInputFields(sessionInfo, partnerId);
+                    this.updateSessionUI(sessionInfo);
+                }
+            } catch (error) {
+                console.error("Error refreshing messages:", error);
+            }
+        }
+
+        hasSessionStateChanged(newSessionInfo) {
+            if (!this.lastSessionState) return true;
+            
+            return (
+                this.lastSessionState.session_active !== newSessionInfo.session_active ||
+                this.lastSessionState.expires_at !== newSessionInfo.expires_at
+            );
+        }
+
+        debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+
 
         setupMessageInput() {
             const messageInput = this.findOdooField('new_message') || 
@@ -482,41 +551,50 @@
         }
 
 
-        updateInputFields(sessionInfo, partnerId) {
-            if (!this.isInitialized) return;
-        
-            const hasContact = !!partnerId;
-            const isSessionActive = sessionInfo?.session_active || false;
-            const hasContactsList = document.querySelector('.contact-item') !== null;
-        
-            const normalInput = document.getElementById('normal-message-input');
-            const templateSection = document.querySelector('.template-message-group');
-        
-            // Case 1: No contacts available
-            if (!hasContactsList) {
-                if (normalInput) normalInput.style.display = 'none';
-                if (templateSection) templateSection.style.display = 'none';
-                return;
-            }
-        
-            // Case 2: Contact selected with active session
-            if (hasContact && isSessionActive) {
-                if (normalInput) normalInput.style.display = 'flex';
-                if (templateSection) templateSection.style.display = 'none';
-                return;
-            }
-        
-            // Case 3: Contact selected but no active session
-            if (hasContact && !isSessionActive) {
-                if (normalInput) normalInput.style.display = 'none';
-                if (templateSection) templateSection.style.display = 'block';
-                return;
-            }
-        
-            // Case 4: No contact selected but contacts exist
-            if (!hasContact && hasContactsList) {
-                if (normalInput) normalInput.style.display = 'none';
-                if (templateSection) templateSection.style.display = 'block';
+        async updateInputFields(sessionInfo, partnerId) {
+            if (!this.isInitialized || this.isUpdatingUI) return;
+            
+            this.isUpdatingUI = true;
+            try {
+                const hasContact = !!partnerId;
+                const isSessionActive = sessionInfo?.session_active || false;
+                const hasContactsList = document.querySelector('.contact-item') !== null;
+    
+                // Only update if state actually changed
+                const currentState = `${hasContact}-${isSessionActive}-${hasContactsList}`;
+                if (this.lastUIState === currentState) {
+                    return; // No change needed
+                }
+                this.lastUIState = currentState;
+    
+                const normalInput = document.getElementById('normal-message-input');
+                const templateSection = document.querySelector('.template-message-group');
+    
+                // Your existing logic here...
+                if (!hasContactsList) {
+                    if (normalInput) normalInput.style.display = 'none';
+                    if (templateSection) templateSection.style.display = 'none';
+                    return;
+                }
+    
+                if (hasContact && isSessionActive) {
+                    if (normalInput) normalInput.style.display = 'flex';
+                    if (templateSection) templateSection.style.display = 'none';
+                    return;
+                }
+    
+                if (hasContact && !isSessionActive) {
+                    if (normalInput) normalInput.style.display = 'none';
+                    if (templateSection) templateSection.style.display = 'block';
+                    return;
+                }
+    
+                if (!hasContact && hasContactsList) {
+                    if (normalInput) normalInput.style.display = 'none';
+                    if (templateSection) templateSection.style.display = 'block';
+                }
+            } finally {
+                this.isUpdatingUI = false;
             }
         }
 
@@ -761,42 +839,6 @@
                 });
             }
         }
-
-
-        // hideInputsOnLoad() {
-        //     // Try multiple times to ensure elements exist
-        //     const hideInputs = () => {
-        //         const normalInput = document.getElementById('normal-message-input');
-        //         const templateSection = document.getElementById('template-message-input');
-                
-        //         console.log('Attempting to hide inputs:', { normalInput: !!normalInput, templateSection: !!templateSection });
-                
-        //         if (normalInput) {
-        //             normalInput.style.display = 'none';
-        //             console.log('Hidden normal input');
-        //         }
-        //         if (templateSection) {
-        //             templateSection.style.display = 'none';
-        //             console.log('Hidden template section');
-        //         }
-                
-        //         // If elements still don't exist, try again after a short delay
-        //         if (!normalInput || !templateSection) {
-        //             setTimeout(hideInputs, 100);
-        //         }
-        //     };
-            
-        //     // Try immediately
-        //     hideInputs();
-            
-        //     // Also try after a short delay
-        //     setTimeout(hideInputs, 50);
-        //     setTimeout(hideInputs, 200);
-        // }
-
-
-
-
 
 
         // Method 1: Enhanced URL monitoring with multiple detection methods

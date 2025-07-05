@@ -175,7 +175,7 @@ class WhatsappChat(models.TransientModel):
                 raise ValidationError("Selected template not found")
 
             # Check session via API only
-            session_info = self.check_contact_active_session(partner.mobile or partner.phone, config.sandbox_join_code)
+            session_info = self.check_contact_active_session(partner.mobile or partner.phone)
             if not session_info.get('session_active'):
                 raise ValidationError("No active session found. Please check the contact's session status.")
 
@@ -818,7 +818,7 @@ class WhatsappChat(models.TransientModel):
         
         try:
             # Check session status via API only
-            session_info = self.check_contact_active_session(partner.mobile or partner.phone, config.sandbox_join_code)
+            session_info = self.check_contact_active_session(partner.mobile or partner.phone)
             if not session_info.get('session_active'):
                 raise UserError(
                     "No active session found. Please send a template message first to start a session."
@@ -1007,7 +1007,7 @@ class WhatsappChat(models.TransientModel):
             url = f"https://app.lipachat.com/api/v1/sandbox/active-session/tenetur"
             headers = {
                 'apiKey': config.api_key,
-                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYXJhd2Fqb3NodWE3QGdtYWlsLmNvbSIsImlhdCI6MTc1MTc0OTk3OSwiZXhwIjoxNzUxNzUzNTc5fQ.dVbD2XL9odn8DHLW9x6lYMg6ZKaPkz8XOKt_wQzjov0'
+                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYXJhd2Fqb3NodWE3QGdtYWlsLmNvbSIsImlhdCI6MTc1MTc1Nzc3OSwiZXhwIjoxNzUxNzYxMzc5fQ.snu-7Ji4cmSafHF6lXSR6YD0IDLOm2eQ6eFAvWPq7ZE'
              }
             response = requests.get(url, headers=headers, timeout=5)
 
