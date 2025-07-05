@@ -2,6 +2,7 @@
 
 from odoo import models, fields, api
 from datetime import datetime, timedelta
+import pytz
 import logging
 import json # Import json for RPC response
 from odoo.exceptions import ValidationError
@@ -159,7 +160,7 @@ class WhatsappChat(models.TransientModel):
 
     
     def send_template_message_v2(self, partner_id, template_id, placeholders, media_url=None):
-        """Send WhatsApp template message with improved error handling and session checks"""
+        """Send WhatsApp template message with API session check only"""
         try:
             config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
             if not config:
@@ -173,23 +174,24 @@ class WhatsappChat(models.TransientModel):
             if not template.exists():
                 raise ValidationError("Selected template not found")
 
-            # Check if session already exists
-            session_info = self.rpc_get_session_info(partner_id)
-            session_active = session_info.get('active', False)
-            
-            components2 = self._prepare_template_components(template, placeholders, media_url)
-            _logger.info(f"Template component data: "+json.dumps(components2))
+            # Check session via API only
+            session_info = self.check_contact_active_session(partner.mobile or partner.phone, config.sandbox_join_code)
+            if not session_info.get('session_active'):
+                raise ValidationError("No active session found. Please check the contact's session status.")
 
-            if isinstance(components2, str):
+            components = self._prepare_template_components(template, placeholders, media_url)
+            _logger.info(f"Template component data: "+json.dumps(components))
+
+            if isinstance(components, str):
                 try:
-                    components2 = json.loads(components2)
+                    components = json.loads(components)
                 except json.JSONDecodeError as e:
                     raise ValidationError(f"Invalid template components format: {str(e)}")
 
             template_data = {
                 'name': template.name,
                 'languageCode': template.language or 'en',
-                'components': components2
+                'components': components
             }
 
             headers = {
@@ -204,8 +206,6 @@ class WhatsappChat(models.TransientModel):
                 "template": template_data
             }
 
-            _logger.info(f"Template component data: "+json.dumps(data))
-
             response = requests.post(
                 f"{config.api_base_url}/whatsapp/template",
                 headers=headers,
@@ -216,11 +216,7 @@ class WhatsappChat(models.TransientModel):
             response_data = response.json() if response.content else {}
 
             if response_data.get('status') == 'success':
-                # Create message record with proper placeholder handling
-                placeholders = []
-                if components2.get('body', {}).get('placeholders'):
-                    placeholders = components2['body']['placeholders']
-                
+                # Create message record
                 self.env['lipachat.message'].create({
                     'partner_id': partner_id,
                     'phone_number': partner.mobile or partner.phone,
@@ -234,21 +230,12 @@ class WhatsappChat(models.TransientModel):
                     'state': 'SENT'
                 })
 
-                # Only start new session if one doesn't already exist
-                session_started = False
-                if not session_active:
-                    session_started = self.start_session_tracking(partner.id)
-                    _logger.info(f"New session started for partner {partner.id}")
-                else:
-                    _logger.info(f"Using existing session for partner {partner.id}")
-                
                 self._clear_template_data()
                 
                 return {
                     'status': 'success',
                     'message': 'Template message sent successfully!',
-                    'session_started': session_started,
-                    'session_info': self.rpc_get_session_info(partner.id)
+                    'session_info': session_info
                 }
             else:
                 error_msg = response_data.get('message', 'Unknown error')
@@ -814,7 +801,7 @@ class WhatsappChat(models.TransientModel):
 
     @api.model
     def rpc_send_message(self, partner_id, message_text):
-        """Dedicated RPC method for sending messages with session validation"""
+        """Dedicated RPC method for sending messages with API session validation"""
         if not partner_id:
             raise UserError("Please select a contact first")
         
@@ -830,11 +817,11 @@ class WhatsappChat(models.TransientModel):
             raise UserError("No active LipaChat configuration found")
         
         try:
-            # Check session status first
-            session_info = self.rpc_get_session_info(partner_id)
-            if not session_info.get('active'):
+            # Check session status via API only
+            session_info = self.check_contact_active_session(partner.mobile or partner.phone, config.sandbox_join_code)
+            if not session_info.get('session_active'):
                 raise UserError(
-                    "No active session. Please send a template message first to start a session."
+                    "No active session found. Please send a template message first to start a session."
                 )
             
             message = self.env['lipachat.message'].create({
@@ -848,14 +835,10 @@ class WhatsappChat(models.TransientModel):
             
             message.send_message()
             
-            # Don't start new session - just use existing one
-            _logger.info(f"Using existing session for partner {partner.id}")
-            
             return {
                 'status': 'success',
                 'message': f'Message sent to {partner.name}',
-                'session_started': False,  # No new session started
-                'session_info': session_info  # Return current session info
+                'session_info': session_info
             }
         except Exception as e:
             _logger.error(f"Failed to send message: {str(e)}")
@@ -1009,5 +992,65 @@ class WhatsappChat(models.TransientModel):
             'messages_html': self.rpc_get_messages_html(most_recent['partner_id']),
             'session_info': self.rpc_get_session_info(most_recent['partner_id'])
         }
+    
+
+    def check_contact_active_session(self, contact_phone):
+        """Check if contact has an active session via the API endpoint"""
+        try:
+            if not contact_phone:
+                return {'status': False, 'message': 'Missing phone number'}
+            
+            config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
+            if not config:
+                return {'status': False, 'message': 'No active configuration'}
+                
+            url = f"https://app.lipachat.com/api/v1/sandbox/active-session/tenetur"
+            headers = {
+                'apiKey': config.api_key,
+                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYXJhd2Fqb3NodWE3QGdtYWlsLmNvbSIsImlhdCI6MTc1MTc0OTk3OSwiZXhwIjoxNzUxNzUzNTc5fQ.dVbD2XL9odn8DHLW9x6lYMg6ZKaPkz8XOKt_wQzjov0'
+             }
+            response = requests.get(url, headers=headers, timeout=5)
+
+            _logger.info("Session info response:\n%s", response.json())
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') and data.get('session'):
+                    # Check if session is expired
+                    expires_at = data['session'].get('expiresAt')
+                    if expires_at:
+                        try:
+                            expires_dt = datetime.strptime(expires_at, "%Y-%m-%dT%H:%M:%S.%f%z")
+                            now = datetime.now(pytz.UTC)
+                            if expires_dt > now:
+                                return {
+                                    'status': True,
+                                    'session_active': True,
+                                    'expires_at': expires_at,
+                                    'session_data': data['session']
+                                }
+                        except ValueError as e:
+                            _logger.error(f"Error parsing datetime {expires_at}: {str(e)}")
+                            # Continue with expired session if parsing fails
+                
+                return {
+                    'status': data.get('status', False),
+                    'message': data.get('message', 'No active session'),
+                    'session_active': False
+                }
+                
+            return {
+                'status': False,
+                'message': f'API request failed with status {response.status_code}',
+                'session_active': False
+            }
+            
+        except Exception as e:
+            _logger.error(f"Error checking active session: {str(e)}")
+            return {
+                'status': False,
+                'message': str(e),
+                'session_active': False
+            }
 
     

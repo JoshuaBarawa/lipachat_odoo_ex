@@ -133,10 +133,24 @@
                 this.updateContactSelectionUI(partnerId);
                 this.updateChatHeader(this.currentSelectedContactName);
                 this.updateOdooFields(partnerId, this.currentSelectedContactName);
+
+                // First check session status via API
+                const partner = await this.getPartnerDetails(partnerId);
+
+                const sessionInfo = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'check_contact_active_session',
+                    [partner.mobile || partner.phone, partner.mobile || partner.phone]
+                );
                 
-                // Check session status and update inputs
-                const sessionInfo = await this.checkSessionStatus(partnerId);
                 this.updateInputFields(sessionInfo, partnerId);
+
+                // Start session timer if active
+                if (sessionInfo.session_active && sessionInfo.expires_at) {
+                    this.startSessionTimer(sessionInfo.expires_at);
+                } else {
+                    this.stopSessionTimer();
+                }
                 
                 // Load messages
                 const messagesHtml = await this.makeRpcCall(
@@ -146,13 +160,13 @@
                 );
                 this.renderMessages(messagesHtml);
                 
-                if (sessionInfo.active) {
-                    this.sessionEndCallback = () => {
-                        this.showChatInfo('Session has expired');
-                        this.checkSessionStatus(partnerId);
-                        this.updateInputFields({ active: false }, partnerId); // Update inputs when session expires
-                    };
-                }
+                // if (sessionInfo.active) {
+                //     this.sessionEndCallback = () => {
+                //         this.showChatInfo('Session has expired');
+                //         this.checkSessionStatus(partnerId);
+                //         this.updateInputFields({ active: false }, partnerId); // Update inputs when session expires
+                //     };
+                // }
             } catch (error) {
                 console.error("Error in selectContact:", error);
                 this.renderMessages(`
@@ -161,6 +175,24 @@
                     </div>
                 `);
             }
+        }
+
+        async getPartnerDetails(partnerId) {
+            return await this.makeRpcCall(
+                'res.partner',
+                'read',
+                [partnerId, ['name', 'mobile', 'phone']]
+            ).then(results => results[0]);
+        }
+        
+        async getSandboxCode() {
+            const config = await this.makeRpcCall(
+                'lipachat.config',
+                'search_read',
+                [[('active', '=', True)], ['sandbox_join_code']],
+                {'limit': 1}
+            );
+            return config[0]?.sandbox_join_code || '';
         }
         
 
@@ -451,18 +483,12 @@
 
 
         updateInputFields(sessionInfo, partnerId) {
-            // First check if we're initialized
             if (!this.isInitialized) return;
         
             const hasContact = !!partnerId;
-            const isSessionActive = sessionInfo?.active || false;
+            const isSessionActive = sessionInfo?.session_active || false;
             const hasContactsList = document.querySelector('.contact-item') !== null;
         
-            console.log("Update Input Fields - Contact:", hasContact, 
-                        "Session Active:", isSessionActive, 
-                        "Has Contacts:", hasContactsList);
-        
-            // Get the input elements
             const normalInput = document.getElementById('normal-message-input');
             const templateSection = document.querySelector('.template-message-group');
         
@@ -538,25 +564,31 @@
         }
 
 
-        startSessionTimer(remainingSeconds) {
-            this.stopSessionTimer(); // Clear any existing timer
+        startSessionTimer(expiresAt) {
+            this.stopSessionTimer();
             
-            // Update immediately
-            this.updateTimerDisplay(remainingSeconds);
-            
-            // Start interval
-            this.sessionTimerInterval = setInterval(() => {
-                remainingSeconds--;
-                this.updateTimerDisplay(remainingSeconds);
+            const updateTimer = () => {
+                const now = new Date();
+                const expiration = new Date(expiresAt);
+                const remainingSeconds = Math.max(0, Math.floor((expiration - now) / 1000));
                 
                 if (remainingSeconds <= 0) {
                     this.stopSessionTimer();
-                    if (this.sessionEndCallback) {
-                        this.sessionEndCallback();
-                    }
+                    this.showChatInfo('Session has expired');
+                    this.updateInputFields({ session_active: false }, this.currentSelectedPartnerId);
+                    return;
                 }
-            }, 1000);
+                
+                this.updateTimerDisplay(remainingSeconds);
+            };
+            
+            // Update immediately
+            updateTimer();
+            
+            // Update every second
+            this.sessionTimerInterval = setInterval(updateTimer, 1000);
         }
+
 
         updateTimerDisplay(seconds) {
             const minutes = Math.floor(seconds / 60);

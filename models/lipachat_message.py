@@ -682,7 +682,6 @@ class LipachatMessage(models.Model):
         return True
 
     def _send_single_message(self, recipient, config):
-        """Send message to a single recipient with session validation"""
         if not config.api_key:
             raise ValidationError(_("Please configure your API key before sending messages."))
 
