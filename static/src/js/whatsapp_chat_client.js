@@ -274,7 +274,7 @@
 
                 if (result && result.status === 'success') {
 
-                    // this.showChatSuccess(result.message);
+                    this.showChatSuccess('Message sent successfully');
                      // Check if session was started
                         if (result.session_started) {
                             setTimeout(() => {
