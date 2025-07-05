@@ -30,6 +30,8 @@
             this.forceContactReselection = false;
             this.debouncedUpdateInputFields = this.debounce(this.updateInputFields.bind(this), 100);
 
+            this.autoSelectContact = false;
+
         }
 
         addEventListener(element, event, handler) {
@@ -367,62 +369,80 @@
 
 
         async updateContactsList() {
-        try {
-            const contactsHtml = await this.makeRpcCall(
-                'whatsapp.chat',
-                'rpc_get_contacts_html',
-                [],
-                {}
-            );
-            
-            const contactsContainer = document.querySelector('.chat-contacts .contacts-list') ||
-                                    document.querySelector('.o_whatsapp_contacts_html');
-            if (contactsContainer) {
-                contactsContainer.innerHTML = contactsHtml;
+            try {
+                const contactsHtml = await this.makeRpcCall(
+                    'whatsapp.chat',
+                    'rpc_get_contacts_html',
+                    [],
+                    {}
+                );
                 
-                // Restore selection UI
-                if (this.currentSelectedPartnerId) {
-                    this.updateContactSelectionUI(this.currentSelectedPartnerId);
-                }
-                
-                // Only update input fields if no contact is selected or if contacts list state changed
-                const hasContacts = contactsContainer.querySelector('.contact-item') !== null;
-                const contactsStateChanged = this.lastContactsState !== hasContacts;
-                this.lastContactsState = hasContacts;
-                
-                if (!this.currentSelectedPartnerId || contactsStateChanged) {
-                    this.updateInputFields({ session_active: false }, this.currentSelectedPartnerId);
-                }
-            }
-        } catch (error) {
-            console.error("Error updating contacts list:", error);
-        }
-    }
-
-
-
-
-        startAutoRefresh() {
-            if (this.autoRefreshInterval) {
-                clearInterval(this.autoRefreshInterval);
-            }
-    
-            this.autoRefreshInterval = setInterval(async () => {
-                if (document.visibilityState === 'visible') {
-                    try {
-                        // Update contacts list first
-                        await this.updateContactsList();
-                        
-                        // Only refresh messages for selected contact, don't re-select
-                        if (this.currentSelectedPartnerId) {
-                            await this.refreshMessagesOnly(this.currentSelectedPartnerId);
+                const contactsContainer = document.querySelector('.chat-contacts .contacts-list') ||
+                                        document.querySelector('.o_whatsapp_contacts_html');
+                if (contactsContainer) {
+                    contactsContainer.innerHTML = contactsHtml;
+                    
+                    // Check if we have contacts after update
+                    const hasContacts = contactsContainer.querySelector('.contact-item') !== null;
+                    
+                    // Restore selection UI if a contact was selected
+                    if (this.currentSelectedPartnerId) {
+                        this.updateContactSelectionUI(this.currentSelectedPartnerId);
+                        // Update input fields for selected contact
+                        const sessionInfo = await this.getSessionInfo(this.currentSelectedPartnerId);
+                        this.updateInputFields(sessionInfo, this.currentSelectedPartnerId, hasContacts);
+                    } else {
+                        // No contact selected - show appropriate state
+                        if (hasContacts) {
+                            this.showEmptyMessageArea();
+                        } else {
+                            this.showNoContactsMessage();
                         }
-                    } catch (error) {
-                        console.error("Error during auto-refresh:", error);
+                        this.updateInputFields({ session_active: false }, null, hasContacts);
                     }
                 }
-            }, 10000);
+            } catch (error) {
+                console.error("Error updating contacts list:", error);
+                this.updateInputFields({ session_active: false }, null, false);
+            }
         }
+
+
+
+
+    startAutoRefresh() {
+        if (this.autoRefreshInterval) {
+            clearInterval(this.autoRefreshInterval);
+        }
+
+        this.autoRefreshInterval = setInterval(async () => {
+            if (document.visibilityState === 'visible') {
+                try {
+                    // Always update contacts list
+                    await this.updateContactsList();
+                    
+                    // Only refresh messages if a contact is selected
+                    if (this.currentSelectedPartnerId) {
+                        const messagesHtml = await this.makeRpcCall(
+                            'whatsapp.chat',
+                            'rpc_get_messages_html',
+                            [this.currentSelectedPartnerId]
+                        );
+                        this.renderMessages(messagesHtml);
+                        
+                        // Check session status
+                        const sessionInfo = await this.getSessionInfo(this.currentSelectedPartnerId);
+                        if (sessionInfo && this.hasSessionStateChanged(sessionInfo)) {
+                            this.updateInputFields(sessionInfo, this.currentSelectedPartnerId);
+                            this.updateSessionUI(sessionInfo);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error during auto-refresh:", error);
+                }
+            }
+        }, 10000);
+    }
 
 
         async refreshMessagesOnly(partnerId) {
@@ -551,52 +571,76 @@
         }
 
 
-        async updateInputFields(sessionInfo, partnerId) {
-            if (!this.isInitialized || this.isUpdatingUI) return;
+        updateInputFields(sessionInfo, partnerId, hasContacts = null) {
+            if (!this.isInitialized) return;
+    
+            const hasContact = !!partnerId;
+            const isSessionActive = sessionInfo?.session_active || false;
             
-            this.isUpdatingUI = true;
-            try {
-                const hasContact = !!partnerId;
-                const isSessionActive = sessionInfo?.session_active || false;
-                const hasContactsList = document.querySelector('.contact-item') !== null;
+            // Check if contacts exist if not provided
+            if (hasContacts === null) {
+                hasContacts = document.querySelector('.contact-item') !== null;
+            }
     
-                // Only update if state actually changed
-                const currentState = `${hasContact}-${isSessionActive}-${hasContactsList}`;
-                if (this.lastUIState === currentState) {
-                    return; // No change needed
-                }
-                this.lastUIState = currentState;
+            const normalInput = document.getElementById('normal-message-input');
+            const templateSection = document.querySelector('.template-message-group');
     
-                const normalInput = document.getElementById('normal-message-input');
-                const templateSection = document.querySelector('.template-message-group');
+            // Case 1: No contacts available at all
+            if (!hasContacts) {
+                if (normalInput) normalInput.style.display = 'none';
+                if (templateSection) templateSection.style.display = 'none';
+                this.showNoContactsMessage();
+                return;
+            }
     
-                // Your existing logic here...
-                if (!hasContactsList) {
-                    if (normalInput) normalInput.style.display = 'none';
-                    if (templateSection) templateSection.style.display = 'none';
-                    return;
-                }
+            // Case 2: Contact selected with active session
+            if (hasContact && isSessionActive) {
+                if (normalInput) normalInput.style.display = 'flex';
+                if (templateSection) templateSection.style.display = 'none';
+                return;
+            }
     
-                if (hasContact && isSessionActive) {
-                    if (normalInput) normalInput.style.display = 'flex';
-                    if (templateSection) templateSection.style.display = 'none';
-                    return;
-                }
+            // Case 3: Contact selected but no active session
+            if (hasContact && !isSessionActive) {
+                if (normalInput) normalInput.style.display = 'none';
+                if (templateSection) templateSection.style.display = 'block';
+                return;
+            }
     
-                if (hasContact && !isSessionActive) {
-                    if (normalInput) normalInput.style.display = 'none';
-                    if (templateSection) templateSection.style.display = 'block';
-                    return;
-                }
-    
-                if (!hasContact && hasContactsList) {
-                    if (normalInput) normalInput.style.display = 'none';
-                    if (templateSection) templateSection.style.display = 'block';
-                }
-            } finally {
-                this.isUpdatingUI = false;
+            // Case 4: No contact selected but contacts exist
+            if (!hasContact && hasContacts) {
+                if (normalInput) normalInput.style.display = 'none';
+                if (templateSection) templateSection.style.display = 'none'; // CHANGED: Hide template section too
+                return;
             }
         }
+
+
+        showNoContactsMessage() {
+            const messagesContainer = document.getElementById('chat-messages-container');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = `
+                    <div class="no-contacts-state">
+                        <div style="
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100%;
+                            min-height: 300px;
+                            color: #666;
+                            text-align: center;
+                            padding: 20px;
+                        ">
+                            <i class="fa fa-address-book-o" style="font-size: 48px; margin-bottom: 20px; color: #ccc;"></i>
+                            <h3 style="margin: 0 0 10px 0; font-weight: normal;">No Contacts Found</h3>
+                            <p style="margin: 0; font-size: 14px;">No WhatsApp contacts are available for messaging</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    
 
         
 
@@ -962,22 +1006,29 @@
 
         // Method 4: Reinitialize when WhatsApp interface is detected
         reinitializeForWhatsApp() {
-            // if (this.isInitialized) {
-            //     console.log('Already initialized for WhatsApp');
-            //     return;
-            // }
-            
             console.log('Reinitializing for WhatsApp interface');
-            // this.hideInputsOnLoad();
             
             // Reset initialization state
             this.isInitialized = false;
             this.initPromise = null;
             
+            // Clear any selected contact
+            this.currentSelectedPartnerId = null;
+            this.currentSelectedContactName = null;
+            
             // Initialize again
             this.initialize().catch(error => {
                 console.error("Failed to reinitialize WhatsApp Chat:", error);
             });
+        }
+
+
+        enableAutoContactSelection() {
+            this.autoSelectContact = true;
+        }
+    
+        disableAutoContactSelection() {
+            this.autoSelectContact = false;
         }
 
 
@@ -1054,6 +1105,69 @@
         }
 
 
+        showInitialState() {
+            // Clear any selected contact state
+            this.currentSelectedPartnerId = null;
+            this.currentSelectedContactName = null;
+            this.lastMessageId = 0;
+    
+            // Clear chat header
+            this.updateChatHeader('Select a contact to start chatting');
+    
+            // Clear Odoo fields
+            this.clearOdooFields();
+    
+            // Show empty message area with instruction
+            this.showEmptyMessageArea();
+    
+            // Show appropriate input fields
+            const hasContacts = document.querySelector('.contact-item') !== null;
+            this.updateInputFields({ session_active: false }, null, hasContacts);
+        }
+
+        clearOdooFields() {
+            const contactField = this.findOdooField('contact');
+            if (contactField) {
+                contactField.value = '';
+                contactField.dispatchEvent(new Event('input', { bubbles: true }));
+                contactField.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+    
+            const partnerIdField = this.findOdooField('contact_partner_id');
+            if (partnerIdField) {
+                partnerIdField.value = '';
+                partnerIdField.dispatchEvent(new Event('input', { bubbles: true }));
+                partnerIdField.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+
+        showEmptyMessageArea() {
+            const messagesContainer = document.getElementById('chat-messages-container');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = `
+                    <div class="empty-chat-state">
+                        <div style="
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100%;
+                            min-height: 300px;
+                            color: #666;
+                            text-align: center;
+                            padding: 20px;
+                        ">
+                            <i class="fa fa-whatsapp" style="font-size: 48px; margin-bottom: 20px; color: #25D366;"></i>
+                            <h3 style="margin: 0 0 10px 0; font-weight: normal;">Welcome to WhatsApp Chat</h3>
+                            <p style="margin: 0; font-size: 14px;">Select a contact from the list to start messaging</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+
         
         async _doInitialize() {
             console.log("WhatsApp Chat Client initializing...");
@@ -1062,36 +1176,28 @@
                 console.log('Not on WhatsApp interface - skipping initialization');
                 return;
             }
-
+    
             this.showLoadingState(true);
-
+    
             try {
                 // Hide all inputs initially
                 const normalInput = document.getElementById('normal-message-input');
                 const templateSection = document.querySelector('.template-message-group');
                 if (normalInput) normalInput.style.display = 'none';
                 if (templateSection) templateSection.style.display = 'none';
-
-                // Load everything in parallel
+    
+                // CHANGED: Don't preload recent contact, just load contacts list
                 await Promise.all([
-                    this.preloadRecentContact(),
                     this.updateContactsList(),
                     this.loadTemplates()
                 ]);
-
+    
                 // Setup all event listeners
                 this.setupEventListeners();
-
-                // Check if we have a selected contact
-                if (this.currentSelectedPartnerId) {
-                    const sessionInfo = await this.checkSessionStatus(this.currentSelectedPartnerId);
-                    this.updateInputFields(sessionInfo, this.currentSelectedPartnerId);
-                } else {
-                    // No contact selected - show template section if contacts exist
-                    const hasContacts = document.querySelector('.contact-item') !== null;
-                    this.updateInputFields({ active: false }, false);
-                }
-
+    
+                // CHANGED: Show initial state with no contact selected
+                this.showInitialState();
+    
                 this.startAutoRefresh();
                 this.isInitialized = true;
                 console.log("WhatsApp Chat Client initialized successfully");
@@ -1107,6 +1213,9 @@
          
         async preloadRecentContact() {
             try {
+                console.log("Auto-contact selection disabled");
+                return;
+
                 // Check for initial data in DOM
                 const initialDataEl = document.querySelector('.o_chat_initial_data');
                 if (initialDataEl && initialDataEl.dataset.initialData) {
