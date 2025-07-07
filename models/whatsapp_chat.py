@@ -1003,11 +1003,10 @@ class WhatsappChat(models.TransientModel):
             config = self.env['lipachat.config'].search([('active', '=', True)], limit=1)
             if not config:
                 return {'status': False, 'message': 'No active configuration'}
-                
-            url = f"https://app.lipachat.com/api/v1/sandbox/active-session/tenetur"
+            
+            url = f"https://app.lipachat.com/api/v1/sandbox/contact/active-session/{contact_phone}"
             headers = {
                 'apiKey': config.api_key,
-                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYXJhd2Fqb3NodWE3QGdtYWlsLmNvbSIsImlhdCI6MTc1MTc1Nzc3OSwiZXhwIjoxNzUxNzYxMzc5fQ.snu-7Ji4cmSafHF6lXSR6YD0IDLOm2eQ6eFAvWPq7ZE'
              }
             response = requests.get(url, headers=headers, timeout=5)
 
