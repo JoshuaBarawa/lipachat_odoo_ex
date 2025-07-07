@@ -100,6 +100,9 @@ class LipachatMessage(models.Model):
     # Computed field for truncated message display
     message_text_short = fields.Char('Content Preview', compute='_compute_message_text_short', store=False)
 
+    last_sync_time = fields.Datetime('Last Sync Time', readonly=True)
+    is_synced = fields.Boolean('Synced to System', default=True)
+
     @api.depends('is_incoming')
     def _compute_direction(self):
         for record in self:
@@ -112,38 +115,48 @@ class LipachatMessage(models.Model):
     
     # @api.model
     def fetch_all_messages(self):
-        """Fetch all messages from LipaChat API and sync with local database"""
-        configs = self.env['lipachat.config'].search([('active', '=', True)])
-        
-        if not configs:
-            raise ValidationError(_("No active LipaChat configuration found."))
-        
-        total_fetched = 0
-        total_new = 0
-        
-        for config in configs:
-            try:
-                fetched, new = self._fetch_messages_for_config(config)
-                total_fetched += fetched
-                total_new += new
-            except Exception as e:
-                _logger.error(f"Failed to fetch messages for config {config.name}: {str(e)}")
-                continue
-        
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Messages Synced'),
-                'message': _('Fetched %d messages, %d new messages added.') % (total_fetched, total_new),
-                'type': 'success',
-                'sticky': False,
+        """Manual trigger for fetching messages"""
+        try:
+            configs = self.env['lipachat.config'].search([('active', '=', True)])
+            
+            if not configs:
+                raise ValidationError(_("No active LipaChat configuration found."))
+            
+            total_new = 0
+            
+            for config in configs:
+                try:
+                    _, new = self._fetch_messages_for_config(config)
+                    total_new += new
+                except Exception as e:
+                    _logger.error(f"Failed to fetch messages for config {config.name}: {str(e)}")
+                    continue
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Messages Synced'),
+                    'message': _('%d new messages added.') % total_new,
+                    'type': 'success',
+                    'sticky': False,
+                }
             }
-        }
+        except Exception as e:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Sync Failed'),
+                    'message': _('Error fetching messages: %s') % str(e),
+                    'type': 'danger',
+                    'sticky': True,
+                }
+            }
     
 
     def _fetch_messages_for_config(self, config):
-        """Fetch messages for a specific configuration"""
+        """Fetch all messages from API and filter client-side"""
         if not config.api_key:
             raise ValidationError(_("API key not configured for %s") % config.name)
         
@@ -153,79 +166,88 @@ class LipachatMessage(models.Model):
         }
 
         try:
-            # Initialize variables
-            all_messages = []
-            page = 0
-            total_pages = 1  # Will be updated from first response
-            page_size = 100  # Maximum page size to reduce number of requests
-            
-            # First request to get total pages without parameters
-            initial_response = requests.get(
+            # Make single API call to get all messages
+            response = requests.get(
                 f"{config.api_base_url}/whatsapp/message",
                 headers=headers,
                 timeout=30
             )
             
-            if initial_response.status_code != 200:
+            if response.status_code != 200:
                 raise ValidationError(_("Failed to fetch messages: HTTP %d - %s") % 
-                                    (initial_response.status_code, initial_response.text))
+                                (response.status_code, response.text))
             
             try:
-                initial_data = initial_response.json()
-                total_pages = initial_data.get('totalPages', 1)
-                _logger.info(f"Total pages to fetch: {total_pages}")
+                response_data = response.json()
+                all_messages = response_data.get('data', [])
+                _logger.info(f"Fetched {len(all_messages)} raw messages from API")
+                
+                # Get the newest message we already have in the system
+                last_message = self.search([], order='create_date desc', limit=1)
+                if last_message:
+                    last_message_time = last_message.create_date
+                    # Filter messages to only those newer than our last message
+                    messages = [
+                        msg for msg in all_messages 
+                        if self._parse_timestamp(msg.get('createdAt')) > last_message_time
+                    ]
+                    _logger.info(f"Filtered to {len(messages)} new messages")
+                else:
+                    messages = all_messages
+                    _logger.info("No existing messages, processing all fetched messages")
+                
+                return self._process_fetched_messages(messages, config)
+                
             except ValueError as e:
-                _logger.error(f"Invalid JSON response: {initial_response.text}")
+                _logger.error(f"Invalid JSON response: {response.text}")
                 raise ValidationError(_("Invalid API response format"))
-            
-            # Now fetch all pages with pagination
-            while page < total_pages:
-                params = {
-                    'page': page,
-                    'size': page_size
-                }
-                
-                response = requests.get(
-                    f"{config.api_base_url}/whatsapp/message",
-                    headers=headers,
-                    params=params,
-                    timeout=30
-                )
-                
-                _logger.info(f"Fetching page {page + 1}/{total_pages} with size {page_size}")
-                
-                if response.status_code != 200:
-                    _logger.error(f"Failed to fetch page {page}: HTTP {response.status_code}")
-                    page += 1
-                    continue  # Skip to next page instead of failing completely
-                
-                try:
-                    response_data = response.json()
-                    messages = response_data.get('data', [])
-                    
-                    if messages:
-                        all_messages.extend(messages)
-                        _logger.info(f"Fetched {len(messages)} messages from page {page + 1}")
-                    
-                    # Update total pages in case it changed
-                    current_total = response_data.get('totalPages', total_pages)
-                    if current_total != total_pages:
-                        _logger.info(f"Total pages updated from {total_pages} to {current_total}")
-                        total_pages = current_total
-                    
-                except ValueError as e:
-                    _logger.error(f"Invalid JSON in page {page}: {response.text}")
-                    page += 1
-                    continue
-                
-                page += 1
-            
-            _logger.info(f"Total messages fetched: {len(all_messages)}")
-            return self._process_fetched_messages(all_messages, config)
             
         except requests.exceptions.RequestException as e:
             _logger.error(f"Network error while fetching messages: {str(e)}")
             raise ValidationError(_("Network error while fetching messages: %s") % str(e))
+        
+    
+
+    @api.model
+    def auto_fetch_messages(self):
+        """Automatically fetch new messages from all active configurations"""
+        _logger.info("=== Starting auto_fetch_messages at %s ===", fields.Datetime.now())
+        try:
+            # Get all active configurations
+            configs = self.env['lipachat.config'].search([('active', '=', True)])
+            
+            if not configs:
+                _logger.info("No active LipaChat configurations found for auto-fetch")
+                return True
+                
+            total_new = 0
+            
+            for config in configs:
+                try:
+                    # Fetch and process messages
+                    _, new = self._fetch_messages_for_config(config)
+                    total_new += new
+                    
+                    # Update last sync time
+                    config.write({
+                        'last_sync_time': fields.Datetime.now(),
+                        'last_sync_status': 'success' if new > 0 else 'no_new_messages'
+                    })
+                    
+                except Exception as e:
+                    _logger.error(f"Failed to auto-fetch messages for config {config.name}: {str(e)}")
+                    config.write({
+                        'last_sync_time': fields.Datetime.now(),
+                        'last_sync_status': 'failed'
+                    })
+                    continue
+            
+            _logger.info(f"Auto-fetch completed. {total_new} new messages added.")
+            return True
+            
+        except Exception as e:
+            _logger.error(f"Critical error in auto_fetch_messages: {str(e)}", exc_info=True)
+            return False
         
 
     
@@ -906,6 +928,7 @@ class LipachatMessage(models.Model):
     # Add to LipachatMessage class
     @api.onchange('message_type')
     def _onchange_message_type(self):
+
         """Set default values and visibility when message type changes"""
         for record in self:
             # Clear fields when changing message type
@@ -925,3 +948,39 @@ class LipachatMessage(models.Model):
                 record.buttons_data = False
             if record.message_type != 'template':
                 record.template_name = False
+
+    
+
+
+
+
+from odoo import models, fields
+
+class IrCronInherit(models.Model):
+    _inherit = 'ir.cron'
+
+    # Simply extend the interval_type selection to include seconds
+    interval_type = fields.Selection([
+        ('seconds', 'Seconds'),
+        ('minutes', 'Minutes'),
+        ('hours', 'Hours'),
+        ('days', 'Days'),
+        ('weeks', 'Weeks'),
+        ('months', 'Months')], string='Interval Unit', default='months')
+
+    # Optional: Add a constraint to prevent too frequent executions
+    @api.constrains('interval_type', 'interval_number')
+    def _check_interval_seconds(self):
+        for record in self:
+            if record.interval_type == 'seconds' and record.interval_number < 30:
+                raise ValidationError(
+                    "Minimum interval for seconds is 10 seconds to prevent system overload."
+                )
+
+# You'll also need to update the _intervalTypes mapping in the base cron module
+# But since we can't modify core files, we need to monkey-patch it
+from odoo.addons.base.models.ir_cron import _intervalTypes
+from dateutil.relativedelta import relativedelta
+
+# Add seconds to the interval types mapping
+_intervalTypes['seconds'] = lambda interval: relativedelta(seconds=interval)

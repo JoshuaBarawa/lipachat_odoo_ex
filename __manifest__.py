@@ -57,4 +57,5 @@
         'lipachat_odoo_ex/static/src/js/lipachat_template_client.js',
     ],
    },
+   'post_init_hook': 'post_init_hook',
 }

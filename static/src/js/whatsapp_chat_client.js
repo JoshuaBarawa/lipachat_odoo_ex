@@ -366,8 +366,6 @@
             }
         }
 
-
-
         async updateContactsList() {
             try {
                 const contactsHtml = await this.makeRpcCall(
@@ -418,6 +416,7 @@
         this.autoRefreshInterval = setInterval(async () => {
             if (document.visibilityState === 'visible') {
                 try {
+
                     // Always update contacts list
                     await this.updateContactsList();
                     

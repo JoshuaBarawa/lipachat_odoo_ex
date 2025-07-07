@@ -16,6 +16,18 @@ class LipachatConfig(models.Model):
     default_from_number = fields.Char('From Number', help='Default WhatsApp Business number (e.g., 254110090747)')
     active = fields.Boolean('Active', default=True)
     test_connection = fields.Boolean('Test Connection', compute='_compute_test_connection')
+
+    last_sync_time = fields.Datetime('Last Successful Sync')
+    last_sync_status = fields.Selection([
+        ('success', 'Success'),
+        ('no_new_messages', 'No New Messages'),
+        ('failed', 'Failed')
+    ], string='Last Sync Status')
+    sync_frequency = fields.Integer(
+        'Sync Frequency (minutes)',
+        default=1,
+        help="How often to check for new messages (in minutes)"
+    )
     
     @api.depends('api_key', 'api_base_url')
     def _compute_test_connection(self):
@@ -23,7 +35,19 @@ class LipachatConfig(models.Model):
             record.test_connection = bool(record.api_key and record.api_base_url)
 
     
-    
+    def force_sync_now(self):
+        """Manually trigger immediate message sync"""
+        self.env['lipachat.message'].auto_fetch_messages()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Sync Triggered'),
+                'message': _('Message synchronization has been manually triggered.'),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
     
     def test_api_connection(self):
         """Test API connection"""
