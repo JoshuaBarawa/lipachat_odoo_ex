@@ -265,11 +265,8 @@ class LipachatMessage(models.Model):
                     _logger.warning("Skipping message with no ID")
                     continue
                     
-                # Check if message already exists
-                existing_msg = self.search([
-                    ('incoming_message_id', '=', str(msg_data.get('id'))),
-                    ('config_id', '=', config.id)
-                ], limit=1)
+                # Check if message already exists with improved logic
+                existing_msg = self._find_existing_message(msg_data, config)
                 
                 if existing_msg:
                     # Update existing message status if needed
@@ -288,6 +285,81 @@ class LipachatMessage(models.Model):
         _logger.info(f"Processed {fetched_count} messages, {new_count} new messages added")
         return fetched_count, new_count
     
+
+
+
+    def _find_existing_message(self, msg_data, config):
+        """Find existing message using multiple criteria to avoid duplicates"""
+        api_message_id = str(msg_data.get('id'))
+        wa_message_id = msg_data.get('waMessageId')
+        direction = msg_data.get('direction', '').upper()
+        
+        # First, try to find by incoming_message_id (for all messages)
+        existing_msg = self.search([
+            ('incoming_message_id', '=', api_message_id),
+            ('config_id', '=', config.id)
+        ], limit=1)
+        
+        if existing_msg:
+            return existing_msg
+        
+        # If not found and we have a waMessageId, try to find by message_id
+        if wa_message_id:
+            existing_msg = self.search([
+                ('message_id', '=', wa_message_id),
+                ('config_id', '=', config.id)
+            ], limit=1)
+            
+            if existing_msg:
+                return existing_msg
+        
+        # For outbound messages, also check by phone number, message content, and approximate time
+        if direction == 'OUTBOUND':
+            contact_data = msg_data.get('contact', {})
+            phone_number = contact_data.get('phoneNumber', '')
+            message_text = msg_data.get('text', '')
+            
+            if phone_number and message_text:
+                # Look for messages sent to same number with same content within last hour
+                created_at = self._parse_timestamp(msg_data.get('createdAt'))
+                time_window_start = created_at - timedelta(hours=1)
+                time_window_end = created_at + timedelta(hours=1)
+                
+                existing_msg = self.search([
+                    ('phone_number', '=', phone_number),
+                    ('message_text', '=', message_text),
+                    ('config_id', '=', config.id),
+                    ('is_incoming', '=', False),
+                    ('create_date', '>=', time_window_start),
+                    ('create_date', '<=', time_window_end)
+                ], limit=1)
+                
+                if existing_msg:
+                    return existing_msg
+        
+
+        def _create_message_record_safe(self, vals_without_timestamps, create_date, write_date):
+            """Safely create message record with proper timestamp handling"""
+            record = self.create(vals_without_timestamps)
+            
+            # Then update the timestamps directly in the database
+            # This bypasses Odoo's ORM restrictions on system fields
+            self.env.cr.execute("""
+                UPDATE %s 
+                SET create_date = %%s, write_date = %%s 
+                WHERE id = %%s
+            """ % record._table, (create_date, write_date, record.id))
+            
+            # Invalidate cache to ensure the updated values are reflected
+            record.invalidate_cache(['create_date', 'write_date'])
+            
+            _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
+            return record
+
+        return False
+    
+
+
 
 
     def _create_message_from_api_data(self, msg_data, config):
