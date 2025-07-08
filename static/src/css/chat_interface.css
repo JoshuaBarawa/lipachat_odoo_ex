@@ -2,7 +2,7 @@
 
 /* Container */
 .chat-container {
-    height: 75vh;
+    height: 80vh;
     width: 100%;
     display: flex;
     background: #f0f2f5;
@@ -113,10 +113,14 @@
 /* Input and send button container */
 .chat-input-container {
     background: #f0f2f5;
-    padding: 10px 15px;
+    padding: 5px 15px;
     border-top: 1px solid #e9ecef;
     display: flex;
+    flex-direction: column;
     align-items: center;
+    height: 100px !important;
+    max-height: 280px !important;
+    overflow-y: scroll;
 }
 
 /* Text input */
@@ -129,6 +133,67 @@
     border-radius: 8px;
     overflow-y: scroll; 
 }
+
+
+/* send template message input */
+.send_temp_section{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    align-items: flex-end;
+    justify-content: right;
+    float: right;
+    height: max-content;
+}
+
+.template_media_inputs_sec{
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.template_select_dropdown{
+    width: 100% !important;
+}
+
+.template-media-url-container{
+    width: 100% !important;
+    margin-left: 15px;
+}
+
+.template_message_area{
+    width: 100% !important;
+    border-radius: 4px;
+    width: 100%;
+    height: 80px;
+    overflow-y: scroll;
+}
+
+
+/* send text message input */
+.text-message-input-sec{
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+.o_whatsapp_new_message  {
+    border-radius: 8px;
+    width: 100%;
+    overflow-y: scroll;
+    margin-right: 7px;
+}
+
+.o_whatsapp_new_message textarea {
+    border-radius: 8px;
+    width: 100%;
+    height: 60px !important;
+    min-height: 60px !important;
+    overflow-y: scroll;
+    margin-right: 7px;
+}
+
 
 /* Send button */
 .chat-input-container button {
@@ -147,3 +212,66 @@
 .chat-input-container button:hover {
     background-color: #0056b3;
 }
+
+
+
+.chat-messages-container{
+    background: #f0f8ff;
+    padding: 10px 15px;
+    border-top: 1px solid #e9ecef;
+    align-items: center;
+    height: 95%;
+    max-height: 95%;
+    overflow-y: scroll;
+}
+
+#chat-header-contact-name {
+    background: #f0f2f5;
+    padding: 15px 16px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+}
+
+.chat-container.loading .chat-messages-container,
+.chat-container.loading .contacts-list {
+    opacity: 0.5;
+    pointer-events: none;
+    position: relative;
+}
+
+.chat-container.loading .chat-messages-container::after,
+.chat-container.loading .contacts-list::after {
+    content: "Loading...";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+
+/* template section styles */
+.template-message-group{
+    width: 100% !important;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.template-message-group .o_input {
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    padding: 8px 10px;
+    width: 100% !important; 
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+
+
+
+
+
+
+
+

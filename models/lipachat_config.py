@@ -7,20 +7,47 @@ _logger = logging.getLogger(__name__)
 
 class LipachatConfig(models.Model):
     _name = 'lipachat.config'
-    _description = 'LipaChat Configuration'
+    _description = 'Lipachat Configuration'
     _rec_name = 'name'
 
-    name = fields.Char('Configuration Name', required=True, default='LipaChat Gateway')
+    name = fields.Char('Configuration Name', required=True, default='Lipachat Gateway')
     api_key = fields.Char('API Key', help='Get your API key from https://app.lipachat.com/auth/signup')
     api_base_url = fields.Char('API Base URL', default='https://gateway.lipachat.com/api/v1', required=True)
-    default_from_number = fields.Char('Default From Number', help='Default WhatsApp Business number (e.g., 254110090747)')
+    default_from_number = fields.Char('From Number', help='Default WhatsApp Business number (e.g., 254110090747)')
     active = fields.Boolean('Active', default=True)
     test_connection = fields.Boolean('Test Connection', compute='_compute_test_connection')
+
+    last_sync_time = fields.Datetime('Last Successful Sync')
+    last_sync_status = fields.Selection([
+        ('success', 'Success'),
+        ('no_new_messages', 'No New Messages'),
+        ('failed', 'Failed')
+    ], string='Last Sync Status')
+    sync_frequency = fields.Integer(
+        'Sync Frequency (minutes)',
+        default=1,
+        help="How often to check for new messages (in minutes)"
+    )
     
     @api.depends('api_key', 'api_base_url')
     def _compute_test_connection(self):
         for record in self:
             record.test_connection = bool(record.api_key and record.api_base_url)
+
+    
+    def force_sync_now(self):
+        """Manually trigger immediate message sync"""
+        self.env['lipachat.message'].auto_fetch_messages()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Sync Triggered'),
+                'message': _('Message synchronization has been manually triggered.'),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
     
     def test_api_connection(self):
         """Test API connection"""

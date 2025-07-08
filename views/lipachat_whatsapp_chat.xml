@@ -1,424 +1,107 @@
 <odoo>
     <data>
 
-        <!-- CSS Styling for Chat Interface -->
-        <template id="whatsapp_chat_assets" name="WhatsApp Chat Assets">
-            <style type="text/css">
-                .chat-container {
-                    height: 600px;
-                    display: flex;
-                    border: 1px solid #ddd;
-                    border-radius: 10px;
-                    overflow: hidden;
-                    position: relative;
-                }
-                
-                .chat-contacts {
-                    width: 35%;
-                    background: #f8f9fa;
-                    border-right: 1px solid #ddd;
-                    overflow-y: auto;
-                }
-                
-                .chat-contacts h3 {
-                    background: #25D366;
-                    color: white;
-                    margin: 0;
-                    padding: 15px;
-                    font-size: 16px;
-                    position: sticky;
-                    top: 0;
-                    z-index: 10;
-                }
-                
-                .chat-area {
-                    width: 65%;
-                    display: flex;
-                    flex-direction: column;
-                    background: white;
-                    position: relative;
-                }
-                
-                .chat-header {
-                    background: #25D366;
-                    color: white;
-                    padding: 15px;
-                    border-bottom: 1px solid #ddd;
-                    position: sticky;
-                    top: 0;
-                    z-index: 10;
-                }
-                
-                .chat-messages-container {
-                    flex: 1;
-                    padding: 10px;
-                    overflow-y: auto;
-                    background: #e5ddd5;
-                    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-                    position: relative;
-                }
-                
-                .chat-input-container {
-                    background: #f0f0f0;
-                    padding: 15px;
-                    border-top: 1px solid #ddd;
-                    display: flex;
-                    gap: 10px;
-                    align-items: center;
-                    position: sticky;
-                    bottom: 0;
-                }
-                
-                .chat-input-container textarea {
-                    flex: 1;
-                    border: 1px solid #ddd;
-                    border-radius: 20px;
-                    padding: 10px 15px;
-                    resize: none;
-                    max-height: 80px;
-                    min-height: 40px;
-                }
-                
-                .chat-input-container button {
-                    background: #25D366;
-                    color: white;
-                    border: none;
-                    border-radius: 50%;
-                    width: 45px;
-                    height: 45px;
-                    font-size: 18px;
-                    cursor: pointer;
-                    transition: background-color 0.3s ease;
-                }
-                
-                .chat-input-container button:hover {
-                    background: #128C7E;
-                }
-                
-                .chat-input-container button:active {
-                    transform: scale(0.95);
-                }
-                
-                .contact-item {
-                    transition: all 0.3s ease;
-                    position: relative;
-                }
-                
-                .contact-item:hover {
-                    background-color: #e8f5e8 !important;
-                    transform: translateX(5px);
-                }
-                
-                .contact-item.selected {
-                    background-color: #e8f5e8 !important;
-                    border-left: 4px solid #25D366 !important;
-                    transform: translateX(5px);
-                }
-                
-                .message-bubble {
-                    animation: fadeIn 0.3s ease-in;
-                    transition: all 0.3s ease;
-                }
-                
-                .message-bubble:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                }
-                
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                
-                @keyframes pulse {
-                    0% { background-color: #f0f0f0; }
-                    50% { background-color: #e8f5e8; }
-                    100% { background-color: #f0f0f0; }
-                }
-                
-                .hidden-field {
-                    display: none !important;
-                }
-                
-                .loading-indicator {
-                    position: absolute;
-                    top: 10px;
-                    right: 15px;
-                    background: rgba(37, 211, 102, 0.9);
-                    color: white;
-                    padding: 5px 10px;
-                    border-radius: 15px;
-                    font-size: 12px;
-                    z-index: 1000;
-                    animation: fadeIn 0.5s ease-in;
-                }
-                
-                .online-indicator {
-                    width: 8px;
-                    height: 8px;
-                    background: #25D366;
-                    border-radius: 50%;
-                    display: inline-block;
-                    margin-right: 5px;
-                    animation: pulse-dot 2s infinite;
-                }
-                
-                @keyframes pulse-dot {
-                    0% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                    100% { opacity: 1; }
-                }
-                
-                .refresh-button {
-                    background: #128C7E !important;
-                    border: none !important;
-                    color: white !important;
-                    padding: 8px 15px !important;
-                    border-radius: 20px !important;
-                    font-size: 14px !important;
-                    cursor: pointer !important;
-                    transition: all 0.3s ease !important;
-                }
-                
-                .refresh-button:hover {
-                    background: #0d6b5a !important;
-                    transform: translateY(-1px) !important;
-                }
-                
-                /* Responsive design */
-                @media (max-width: 768px) {
-                    .chat-container {
-                        height: 500px;
-                        flex-direction: column;
-                    }
-                    
-                    .chat-contacts {
-                        width: 100%;
-                        height: 200px;
-                        border-right: none;
-                        border-bottom: 1px solid #ddd;
-                    }
-                    
-                    .chat-area {
-                        width: 100%;
-                        height: 300px;
-                    }
-                }
-                
-                /* Scroll styling */
-                .chat-contacts::-webkit-scrollbar,
-                .chat-messages-container::-webkit-scrollbar {
-                    width: 6px;
-                }
-                
-                .chat-contacts::-webkit-scrollbar-track,
-                .chat-messages-container::-webkit-scrollbar-track {
-                    background: #f1f1f1;
-                }
-                
-                .chat-contacts::-webkit-scrollbar-thumb,
-                .chat-messages-container::-webkit-scrollbar-thumb {
-                    background: #25D366;
-                    border-radius: 3px;
-                }
-                
-                .chat-contacts::-webkit-scrollbar-thumb:hover,
-                .chat-messages-container::-webkit-scrollbar-thumb:hover {
-                    background: #128C7E;
-                }
-                
-                /* Form field styling */
-                .o_form_view .o_form_sheet {
-                    padding: 0 !important;
-                }
-                
-                .o_form_view .o_form_sheet .chat-container {
-                    margin: 0 !important;
-                }
-            </style>
-        </template>
-
-        <!-- Action to open chat -->
-        <record id="action_whatsapp_chat" model="ir.actions.act_window">
-            <field name="name">WhatsApp Chat Interface</field>
-            <field name="res_model">whatsapp.chat</field>
-            <field name="view_mode">form</field>
-            <field name="target">current</field>
-            <field name="context">{'form_view_initial_mode': 'edit'}</field>
-        </record>
-
-        <!-- Form View -->
         <record id="view_whatsapp_chat_form" model="ir.ui.view">
             <field name="name">whatsapp.chat.form</field>
             <field name="model">whatsapp.chat</field>
             <field name="arch" type="xml">
                 <form string="WhatsApp Chat Interface" create="false" edit="false" delete="false">
-                    <header>
-                        <button name="refresh_chat" string="🔄 Refresh Chat" type="object" 
-                                class="refresh-button" 
-                                title="Refresh conversations and messages"/>
-                        <div class="online-indicator" title="Auto-refresh every 10 seconds"></div>
-                        <span style="font-size: 12px; color: #666;">Auto-updating</span>
-                    </header>
                     <sheet>
-                        <!-- Hidden fields for functionality -->
-                        <div class="hidden-field">
-                            <field name="contact"/>
-                            <field name="contact_partner_id"/>
-                            <field name="last_refresh"/>
-                        </div>
-                        
+                      
+                         <!-- Hidden fields for state management -->
+                        <field name="contact" invisible="1"/>
+                        <field name="contact_partner_id" invisible="1"/>
+                        <field name="session_start_time" invisible="1"/>
+                        <field name="session_duration" invisible="1"/>
+                        <field name="session_active" invisible="1"/>
+                        <field name="session_remaining_time" invisible="1"/>
+                        <field name="show_media_url_field" invisible="1"/>
+                        <field name="show_template" invisible="1"/>
+                        <field name="can_send_message" invisible="1"/>
+                        <field name="show_message_section" invisible="1"/>
+                        <field name="template_header_type" invisible="1"/>
+            
+
                         <div class="chat-container">
-                            <!-- Left Panel: Contacts -->
                             <div class="chat-contacts">
-                                <h3>
-                                    💬 Conversations
-                                    <small style="float: right; font-size: 12px; opacity: 0.8;" 
-                                           id="contacts-count"></small>
-                                </h3>
-                                <div style="padding: 10px;">
-                                    <field name="contacts_html" widget="html" nolabel="1"/>
-                                </div>
+                                <h3>Conversations</h3>
+                                <field name="contacts_html" widget="html" nolabel="1" class="o_whatsapp_contacts_html"/>
                             </div>
 
-                            <!-- Right Panel: Chat Area -->
+
                             <div class="chat-area">
-                                <!-- Chat Header -->
+
+                                 <!-- Session header section -->
                                 <div class="chat-header">
-                                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                                        <div>
-                                            <div style="display: flex; align-items: center;">
-                                                <span invisible="not contact">📱 </span>
-                                                <field name="contact" readonly="1" nolabel="1" 
-                                                       invisible="not contact" 
-                                                       style="background: none; border: none; color: white; font-weight: bold; font-size: 16px;"/>
-                                                <span invisible="not contact" style="margin-left: 10px; font-size: 12px; opacity: 0.8;">
-                                                    Active Now
-                                                </span>
-                                            </div>
-                                            <div invisible="not contact" style="font-size: 12px; opacity: 0.9; margin-top: 2px;">
-                                                WhatsApp Business Chat
-                                            </div>
-                                            <div invisible="contact" style="font-size: 14px;">
-                                                Select a contact to start messaging
-                                            </div>
-                                        </div>
-                                        <div invisible="not contact" style="text-align: right;">
-                                            <div style="font-size: 12px; opacity: 0.8;">
-                                                Last updated: <span id="last-update-time"></span>
-                                            </div>
-                                        </div>
+                                    <div>
+                                        <span class="online-indicator"></span>
+                                        <strong id="chat-header-contact-name"><field name="contact" class="oe_inline" readonly="1" nolabel="1"/></strong>
+                                         
+                                         <div id="session-timer-container" style="display: none; margin-left: 15px; color: #666; font-size: 13px;">
+                                            <i class="fa fa-clock-o" style="margin-right: 4px;"/>
+                                            Session: <span id="session-timer-display">00:00</span>
+                                        </div>             
                                     </div>
+
+                                    <field name="contact_partner_id" invisible="1"/>
                                 </div>
 
-                                <!-- Messages Area -->
-                                <div class="chat-messages-container">
-                                    <field name="messages_html" widget="html" nolabel="1"/>
+
+                                 <!-- Messages display area-->
+                                <div class="chat-messages-container" id="chat-messages-container">
+                                    <field name="messages_html" widget="html" nolabel="1" class="o_whatsapp_messages_html"/>
                                 </div>
 
-                                <!-- Message Input -->
-                                <div class="chat-input-container" invisible="not contact">
-                                    <field name="new_message" 
-                                           placeholder="Type a message..." 
-                                           nolabel="1"
-                                           widget="text"
-                                           style="flex: 1; border-radius: 20px; padding: 10px 15px;"
-                                           onkeydown="handleMessageInput(event)"/>
-                                    <button name="send_message" 
-                                            type="object" 
-                                            title="Send Message"
-                                            style="background: #25D366; color: white; border: none; border-radius: 50%; width: 45px; height: 45px;"
-                                            id="send-btn">
-                                        ➤
-                                    </button>
-                                </div>
+
+                                  <!-- Chat inputs container area -->
+                                <div class="chat-input-container">
+
                                 
-                                <!-- Welcome message when no contact selected -->
-                                <div invisible="contact" 
-                                     style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #666; padding: 40px; text-align: center;">
-                                    <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.7;">💬</div>
-                                    <h2 style="color: #25D366; margin-bottom: 10px;">WhatsApp Business Chat</h2>
-                                    <p style="font-size: 16px; margin-bottom: 8px;">Select a conversation from the left to start messaging</p>
-                                    <small style="opacity: 0.8;">Your sent messages and conversation history will appear here</small>
-                                    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #25D366;">
-                                        <strong>💡 Tips:</strong>
-                                        <ul style="text-align: left; margin-top: 10px; font-size: 14px;">
-                                            <li>Messages auto-refresh every 10 seconds</li>
-                                            <li>Use Ctrl+Enter to send messages quickly</li>
-                                            <li>Click refresh button to update conversations</li>
-                                        </ul>
-                                    </div>
+                                    <group string="Template Message (Send Template to activate session with user)" class="template-message-group">
+                                        <field name="template_name" placeholder="Select a template" nolabel="1"/>
+
+                                        <!-- Media URL field (only shown if template has media) -->
+                                        <field name="template_media_url" placeholder="Enter media url: https://" invisible="not template_name or template_header_type == 'TEXT'" nolabel="1"/>
+
+                                        <!-- Show header_text when header_type IS 'TEXT' -->
+                                        <field name="template_header_text" invisible="template_header_type != 'TEXT'" widget="char" nolabel="1" placeholder="Enter header placeholder value e.g. John"/>
+
+                                        <field name="template_variable_values"  placeholder="Enter body placeholder values e.g. John, Monday" 
+                                        widget="char" invisible="not template_name" on_change="1" nolabel="1"/>
+
+
+                                        <div class="btn btn-primary o_whatsapp_send_template_button_v2" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px; justify-content: left; width: max-content">
+                                            <i class="fa fa-paper-plane" style="margin-right: 5px;"/> Send Template
+                                        </div>   
+                                    </group>
+                               
+
+
+                                    <!-- Send text message section -->
+                                    <div id="normal-message-input" class="text-message-input-sec">
+                                        <field name="new_message" placeholder="Type a message..." class="o_whatsapp_new_message" widget="textarea" no_label="1"/> 
+                                        <div class="btn btn-primary o_whatsapp_send_button" style="cursor: pointer; display: inline-flex; align-items: center; padding: 6px 12px;">
+                                            <i class="fa fa-paper-plane" style="margin-right: 7px;"/> Send
+                                        </div>
+                                    </div>       
+
                                 </div>
+
+
                             </div>
                         </div>
-                        
-                        <!-- JavaScript for enhanced functionality -->
-                        <script type="text/javascript">
-                            // Enhanced message input handling
-                            function handleMessageInput(event) {
-                                // Send message with Ctrl+Enter
-                                if (event.ctrlKey &amp;&amp; event.keyCode === 13) {
-                                    event.preventDefault();
-                                    var sendBtn = document.getElementById('send-btn');
-                                    if (sendBtn) {
-                                        sendBtn.click();
-                                    }
-                                }
-                                
-                                // Auto-resize textarea
-                                var textarea = event.target;
-                                textarea.style.height = 'auto';
-                                textarea.style.height = Math.min(textarea.scrollHeight, 80) + 'px';
-                            }
-                            
-                            // Update last update time
-                            function updateLastUpdateTime() {
-                                var timeSpan = document.getElementById('last-update-time');
-                                if (timeSpan) {
-                                    var now = new Date();
-                                    timeSpan.textContent = now.toLocaleTimeString();
-                                }
-                            }
-                            
-                            // Count and display contacts
-                            function updateContactsCount() {
-                                var contacts = document.querySelectorAll('.contact-item');
-                                var countSpan = document.getElementById('contacts-count');
-                                if (countSpan &amp;&amp; contacts.length > 0) {
-                                    countSpan.textContent = contacts.length + ' contacts';
-                                }
-                            }
-                            
-                            // Initialize on page load
-                            document.addEventListener('DOMContentLoaded', function() {
-                                updateLastUpdateTime();
-                                updateContactsCount();
-                                
-                                // Set up periodic updates
-                                setInterval(updateLastUpdateTime, 1000);
-                                setInterval(updateContactsCount, 5000);
-                            });
-                            
-                            // Handle form changes
-                            document.addEventListener('change', function(event) {
-                                if (event.target.name === 'contact_partner_id') {
-                                    setTimeout(function() {
-                                        updateLastUpdateTime();
-                                        updateContactsCount();
-                                    }, 500);
-                                }
-                            });
-                        </script>
                     </sheet>
                 </form>
             </field>
         </record>
 
-        <!-- Menu item for easy access -->
-        <menuitem id="menu_whatsapp_chat_main"
-                  name="WhatsApp Chat"
-                  action="action_whatsapp_chat"
-                  sequence="10"/>
+         <record id="action_whatsapp_chat" model="ir.actions.act_window">
+            <field name="name">WhatsApp Chat Interface</field>
+            <field name="res_model">whatsapp.chat</field>
+            <field name="view_mode">form</field>
+            <field name="target">current</field>
+            <field name="view_id" ref="view_whatsapp_chat_form"/>
+        </record>
 
     </data>
 </odoo>

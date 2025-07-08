@@ -1,56 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Custom CSS for LipaChat Message Styling -->
-        <template id="lipachat_message_assets" name="LipaChat Message Assets">
-            <style type="text/css">
-                /* Previous CSS styles remain unchanged */
-                /* Add this new style for the many2many tags */
-                .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags {
-                    width: 100%;
-                    min-height: 34px;
-                    border-radius: 8px !important;
-                    border: 2px solid #e9ecef !important;
-                    padding: 5px !important;
-                    background: white !important;
-                }
-                .lipachat-message-form .o_field_widget[name="partner_ids"] .o_field_many2many_tags .badge {
-                    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%) !important;
-                    color: white !important;
-                    border: none !important;
-                    margin: 2px !important;
-                    padding: 5px 10px !important;
-                    border-radius: 12px !important;
-                }
-                .lipachat-message-form .o_field_widget[name="partner_ids"] .o_input_dropdown {
-                    width: 100% !important;
-                }
-                .lipachat-message-form .recipient-selection {
-                    margin-bottom: 15px;
-                    border-bottom: 1px solid #e9ecef;
-                    padding-bottom: 15px;
-                }
-                /* Style for bulk template indicator */
-                .bulk-template-indicator {
-                    background: #fff3cd;
-                    border: 1px solid #ffeeba;
-                    color: #856404;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    margin-bottom: 10px;
-                }
-            </style>
-        </template>
-
         <!-- Message Form View -->
         <record id="view_lipachat_message_form" model="ir.ui.view">
             <field name="name">lipachat.message.form</field>
             <field name="model">lipachat.message</field>
             <field name="arch" type="xml">
+           
                 <form string="WhatsApp Message" class="lipachat-message-form">
                     <header>
                         <button name="send_message" string="Send Message" type="object" class="btn-primary" 
-                                invisible="state != 'draft'"/>
+                                invisible="state != 'DRAFT'"/>
+                        <button name="fetch_all_messages" string="Sync Messages" type="object" class="oe_highlight"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -66,78 +27,95 @@
                             <field name="bulk_parent_id" readonly="1" string="View bulk template"/>
                         </div>
 
-                        <div class="recipient-selection">
-                            <h2>Recipients</h2>
+                        <div class="recipient-selection row">
+                         <group>
                             <group>
-                                <group>
-                                    <field name="partner_ids" widget="many2many_tags" 
-                                        placeholder="Select multiple contacts..."
-                                        options="{'no_create': True}"
-                                        readonly="state != 'draft'"/>
-                                </group>
-                                <group>
-                                    <label for="phone_number" string="Or specify phone number"/>
-                                    <div class="o_row">
-                                        <field name="partner_id" options="{'no_create': True}" 
-                                            invisible="partner_ids" placeholder="Select contact"
-                                            readonly="state != 'draft'"/>
-                                        <field name="phone_number" 
-                                            invisible="partner_ids" placeholder="Enter phone number"
-                                            readonly="state != 'draft'"/>
-                                    </div>
-                                </group>
+                                <!-- <field name="partner_ids" widget="many2many_tags" 
+                                    placeholder="Select contacts..."
+                                    options="{'no_create': True}"
+                                    readonly="state != 'draft'"/> -->
+
+                                <field name="partner_id" 
+                                    placeholder="Select a contact..."
+                                    options="{'no_create': True}"
+                                    readonly="state != 'DRAFT'"/>
+
+                                 <field name="view_phone_number" 
+                                    readonly="1"
+                                    string="Contact Phone"
+                                    invisible="not partner_id or state != 'DRAFT'"
+                                    optional="hide"/>
                             </group>
+                         </group>
                         </div>
 
                         <group>
                             <group>
                                 <!-- New config selection -->
                                 <field name="config_id" domain="[('active', '=', True)]" 
-                                       readonly="state != 'draft'"/>
+                                       readonly="state != 'DRAFT'"/>
                                 <!-- from_number is now readonly and related to config -->
                                 <field name="from_number" readonly="1"/>
-                                <field name="message_type" readonly="state != 'draft'"/>
+                                <field name="message_type" readonly="state != 'DRAFT'"/>
                             </group>
                             <group>
-                                <field name="message_id"/>
-                                <field name="create_date"/>
+                                <field name="message_id" invisible="1"/>
+                                <field name="create_date" invisible="1"/>
                                 <field name="is_bulk_template" invisible="1"/>
+                                <!-- Hidden fields for internal use -->
+                                <field name="partner_id" invisible="1"/>
+                                <field name="phone_number" invisible="1"/>
+                                <!-- <field name="direction" invisible="1" readonly="1"/> -->
                             </group>
                         </group>
 
                         <notebook>
                             <page string="Message Content">
-                                <!-- Main message text - full width, no group wrapper -->
-                                <div class="o_group" style="width: 100%; max-width: 100%;">
+                        
+                                  <!-- Text Message Section -->
+                                <div class="o_group" string="Text Message" invisible="message_type != 'text'" style="width: 100%; max-width: 100%;">
                                     <field name="message_text" nolabel="1" placeholder="Enter your message text" 
-                                           style="width: 100%; max-width: 100%;" readonly="state != 'draft'"/>
+                                           style="width: 100%; max-width: 100%;" readonly="state != 'DRAFT'"/>
                                 </div>
-                                <group string="Media Message">
-                                    <field name="media_type" readonly="state != 'draft'"/>
-                                    <field name="media_url" readonly="state != 'draft'"/>
-                                    <field name="caption" readonly="state != 'draft'"/>
+
+                                <!-- Media Message Section -->
+                                <group string="Media Message" invisible="message_type != 'media'">
+                                    <field name="media_type" readonly="state != 'DRAFT'"/>
+                                    <field name="media_url" readonly="state != 'DRAFT'"/>
+                                    <field name="caption" readonly="state != 'DRAFT'"/>
                                 </group>
-                                <group string="Interactive Content">
-                                    <field name="header_text" readonly="state != 'draft'"/>
-                                    <field name="body_text" readonly="state != 'draft'"/>
-                                    <field name="button_text" readonly="state != 'draft'"/>
-                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" 
-                                           nolabel="1" readonly="state != 'draft'"/>
+                                
+                                <!-- Template Message Section -->
+                                <group string="Template Message" invisible="message_type != 'template'">
+                                    <field name="template_name" placeholder="Select a template..."
+                                        readonly="state != 'DRAFT'"/>
+
+                                    <!-- Media URL field (only shown if template has media) -->
+                                    <field name="template_media_url" 
+                                        invisible="template_name == False"
+                                        readonly="state != 'DRAFT'"/>
+
+                                     <field name="template_variables" invisible="1"/>
+
+
+                                    <field name="template_placeholders" 
+                                        string="Template Variables"
+                                        widget="char" 
+                                        placeholder="Enter values for template variables as JSON (e.g., {'name': 'John', 'company': 'ABC Corp'})"
+                                        invisible="template_variables == '[]'"
+                                        readonly="state != 'DRAFT'"/>
+
                                 </group>
-                                <group string="Template Message">
-                                    <field name="template_name" readonly="state != 'draft'"/>
-                                    <field name="template_language" readonly="state != 'draft'"/>
-                                    <field name="template_data" widget="ace" options="{'mode': 'json'}" 
-                                           readonly="state != 'draft'"/>
-                                </group>
+
                             </page>
 
                             <page string="Response Details">
                                 <group>
-                                    <field name="error_message"/>
+                                    <!-- <field name="error_message"/> -->
+                                    <field name="fail_reason"/>
                                     <field name="sent_contacts" readonly="1"/>
                                     <field name="failed_contacts" readonly="1"/>
-                                    <field name="response_data" widget="ace" options="{'mode': 'json'}" readonly="1"/>
+                                    <!-- <field name="response_data" widget="ace" options="{'mode': 'json'}" readonly="1"/> -->
                                 </group>
                             </page>
                         </notebook>
@@ -146,23 +124,42 @@
             </field>
         </record>
 
+
+
+        <record id="ir_cron_auto_fetch_messages" model="ir.cron">
+            <field name="name">Auto Fetch WhatsApp Messages</field>
+            <field name="model_id" ref="model_lipachat_message"/>
+            <field name="state">code</field>
+            <field name="code">model.auto_fetch_messages()</field>
+            <field name="interval_number">30</field>  <!-- More conservative default -->
+            <field name="interval_type">seconds</field>
+            <field name="active">True</field>
+            <field name="numbercall">-1</field>
+            <field name="doall">True</field>
+            <field name="priority">1</field>
+            <field name="nextcall" eval="(datetime.now() + timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')"/>
+        </record>
+
         <!-- Message Tree View (updated to show individual messages) -->
         <record id="view_lipachat_message_tree" model="ir.ui.view">
             <field name="name">lipachat.message.tree</field>
             <field name="model">lipachat.message</field>
             <field name="arch" type="xml">
                 <tree string="WhatsApp Messages" 
-                      decoration-success="state=='sent'" 
-                      decoration-danger="state=='failed'" 
-                      decoration-warning="state=='partially_sent'">
+                    decoration-info="state=='SENT'" 
+                    decoration-success="state=='READ'" 
+                    decoration-danger="state=='FAILED'" 
+                    decoration-warning="state=='partially_sent'">
                     <field name="create_date" string="Created on"/>
                     <field name="partner_id" string="Contact"/>
                     <field name="phone_number" string="Phone Number"/>
                     <field name="message_type" string="Message Type"/>
-                    <field name="message_text" string="Content"/>
-                    <field name="state" string="Status"/>
-                    <!-- <field name="bulk_parent_id" invisible="1"/>
-                    <field name="is_bulk_template" invisible="1"/> -->
+                    <field name="direction" string="Direction" 
+                        decoration-info="direction=='INBOUND'"
+                        decoration-success="direction=='OUTBOUND'"/>
+                    <field name="message_text_short" string="Content"/>
+                    <field name="state" string="Status"
+                        decoration-info="state=='RECEIVED'"/>
                 </tree>
             </field>
         </record>
@@ -177,10 +174,12 @@
                     <field name="phone_number"/>
                     <field name="message_text"/>
                     <field name="state"/>
-                    
-                    <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
-                    <filter string="Sent" name="sent" domain="[('state', '=', 'sent')]"/>
-                    <filter string="Failed" name="failed" domain="[('state', '=', 'failed')]"/>
+                    <field name="direction"/>
+                    <filter string="INBOUND" name="INBOUND" domain="[('direction', '=', 'INBOUND')]"/>
+                    <filter string="OUTBOUND" name="OUTBOUND" domain="[('direction', '=', 'OUTBOUND')]"/>
+                    <filter string="DRAFT" name="DRAFT" domain="[('state', '=', 'DRAFT')]"/>
+                    <filter string="SENT" name="SENT" domain="[('state', '=', 'SENT')]"/>
+                    <filter string="FAILED" name="FAILED" domain="[('state', '=', 'FAILED')]"/>
                     
                     <separator/>
                     <filter string="Today" name="today" 
@@ -190,6 +189,7 @@
                     
                     <group expand="0" string="Group By">
                         <filter string="Status" name="group_status" context="{'group_by': 'state'}"/>
+                        <filter string="Direction" name="group_direction" context="{'group_by': 'direction'}"/>
                         <filter string="Message Type" name="group_type" context="{'group_by': 'message_type'}"/>
                         <filter string="Contact" name="group_contact" context="{'group_by': 'partner_id'}"/>
                         <filter string="Date" name="group_date" context="{'group_by': 'create_date:day'}"/>
@@ -199,18 +199,18 @@
         </record>
 
         <!-- Individual Messages Action -->
-        <record id="action_lipachat_message_individual" model="ir.actions.act_window">
-            <field name="name">Individual WhatsApp Messages</field>
+        <record id="action_lipachat_message" model="ir.actions.act_window">
+            <field name="name">WhatsApp Messages</field>
             <field name="res_model">lipachat.message</field>
             <field name="view_mode">tree,form</field>
             <field name="domain">[('is_bulk_template', '=', False)]</field>
-            <field name="context">{'default_is_bulk_template': False}</field>
+            <field name="search_view_id" ref="view_lipachat_message_search"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    No individual WhatsApp messages yet
+                    No WhatsApp messages yet
                 </p>
                 <p>
-                    Individual message records are created automatically when you send bulk messages.
+                    Send your first WhatsApp message from a contact or create one here.
                 </p>
             </field>
         </record>

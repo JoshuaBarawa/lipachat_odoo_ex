@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+
         <!-- Main Menu -->
         <menuitem id="menu_lipachat_main" 
                   name="LipaChat" 
@@ -13,21 +14,24 @@
                   parent="menu_lipachat_main" 
                   action="action_lipachat_config" 
                   sequence="10"
-                  groups="base.group_system"/>
+                  groups="base.group_system"
+                  />
 
         <!-- Messages Menu -->
         <menuitem id="menu_lipachat_messages" 
                   name="Messages" 
                   parent="menu_lipachat_main" 
                   action="action_lipachat_message" 
-                  sequence="20"/>
+                  sequence="20"
+                  />
 
         <!-- Templates Menu -->
         <menuitem id="menu_lipachat_templates" 
                   name="Templates" 
                   parent="menu_lipachat_main" 
                   action="action_lipachat_template" 
-                  sequence="30"/>
+                  sequence="30"
+                  />
 
         <!-- Menu Item -->
         <menuitem id="menu_whatsapp_chat_interface"

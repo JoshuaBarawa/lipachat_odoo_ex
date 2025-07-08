@@ -7,58 +7,136 @@
             <field name="model">lipachat.template</field>
             <field name="arch" type="xml">
                 <form string="WhatsApp Template">
+                
                     <header>
-                        <button name="create_template" string="Create Template" type="object" class="btn-primary"/>
-                        <button name="sync_templates" string="Sync Templates" type="object"/>
-                        <field name="status" widget="statusbar"/>
+                        <button name="create_template" string="Create Template" type="object" 
+                                class="btn-primary"/>
+                        <field name="status" widget="statusbar" statusbar_visible="draft,submitted,approved,rejected"/>
                     </header>
                     <sheet>
-                        <group>
-                            <group>
-                                <field name="name"/>
-                                <field name="language"/>
-                                <field name="category"/>
-                                <field name="phone_number"/>
-                            </group>
-                            <group>
-                                <field name="template_id" readonly="1"/>
-                            </group>
+                        <!-- First row with Template Name, Category, and Language -->
+                        <group class="flex-container">
+                            <field name="name" class="flex-item"/>
+                            <field name="category" class="flex-item"/>
+                            <field name="language" class="flex-item"/>
+                        </group>
+
+                        <!-- Phone number field -->
+                        <group string="WABA Phone Number" class="mt16">
+                            <field name="phone_number" widget="phone" placeholder="Example: 254110090747"/>
                         </group>
                         
-                        <notebook>
-                            <page string="Template Components">
-                                <!-- Removed attrs for Odoo 17 compatibility -->
-                                <group string="Header">
-                                    <field name="header_format"/>
-                                    <field name="header_text"/>
-                                    <field name="header_example"/>
-                                    <field name="media_id"/>
-                                </group>
+                        <!-- Header Section -->
+                        <group string="Header" class="mt16" invisible="category == 'AUTHENTICATION'">
+                        
+                            <field name="header_media_id" invisible="1" force_save="1"/>
+
+                            <field name="header_type"/>
+                            <field name="header_text" invisible="header_type != 'TEXT'" 
+                                   placeholder="Enter header text (use {{1}}, {{2}} for variables)"/>
+                            <field name="header_example" invisible="header_type != 'TEXT'" 
+                                   placeholder="Example value for {{1}}"/>
+                         </group>
+
+                        <!-- Media Upload Section -->
+                        <div invisible="header_type == 'TEXT' or not header_type" class="header-media-sec">
+                            <group>
+                                <!-- File upload field - always visible when media type is selected -->
+                                    <field name="header_media" filename="header_media_filename"
+                                            invisible="header_type == 'TEXT' or not header_type"/>
+                                    <field name="header_media_filename" invisible="1"/>
                                 
-                                <group string="Body">
-                                    <field name="body_text" nolabel="1"/>
-                                    <field name="body_examples" widget="ace" options="{'mode': 'json'}" placeholder='["Example 1", "Example 2"]'/>
-                                </group>
-                                
-                                <group string="Footer">
-                                    <field name="footer_text"/>
-                                </group>
-                                
-                                <group string="Authentication Settings">
-                                    <field name="add_security_recommendation"/>
-                                    <field name="code_expiration_minutes"/>
-                                </group>
-                                
-                                <group string="Buttons">
-                                    <field name="buttons_data" widget="ace" options="{'mode': 'json'}" nolabel="1" 
-                                           placeholder='[{"type": "QUICK_REPLY", "text": "Button Text"}]'/>
-                                </group>
-                            </page>
+                                <!-- Hidden fields for upload status -->
+                                <field name="is_uploading_media" invisible="1"/>
+                                <field name="upload_status" invisible="1"/>
+                                <field name="upload_error_message" invisible="1"/>
+                            </group>
+                        </div>
+
+
+                         <!-- Upload Media Status Indicators -->
+                        <div invisible="upload_status != 'uploading' or header_type == 'TEXT' or not header_type" class="alert alert-info media-status-indicators" >
+                            <i class="fa fa-spinner fa-spin"/> Uploading media, please wait...
+                        </div>
+                        
+                        <div invisible="upload_status != 'success' or header_type == 'TEXT' or not header_type" class="alert alert-success media-status-indicators">
+                            <i class="fa fa-check-circle"/> Media uploaded successfully! 
+                        </div>
+                        
+                        <div invisible="upload_status != 'error' or header_type == 'TEXT' or not header_type" class="alert alert-danger media-status-indicators">
+                            <i class="fa fa-exclamation-triangle"/> Upload failed
+                            <p invisible="not upload_error_message">
+                                <field name="upload_error_message" readonly="1"/>
+                            </p>
+                        </div>
+                                                
+                        
+                        <!-- Body Section -->
+                         <group string="Body" class="mt16">   
+                                <field name="body_text" nolabel="1" placeholder="Enter your message (use {{1}}, {{2}} for variables)"
+                                    invisible="category == 'AUTHENTICATION'" class="body-message-field"/><br/>
+                         </group>
+                          <group class="mt16">   
+                            <!-- Remove or hide the body_examples field group -->
+                            <field name="body_examples" invisible="1"/>
                             
-                            <page string="Generated JSON">
-                                <field name="component_data" widget="ace" options="{'mode': 'json'}" readonly="1" nolabel="1"/>
-                            </page>
-                        </notebook>
+                            <!-- <field name="body_examples" placeholder='i.e ["Example 1", "Example 2"]' invisible="category == 'AUTHENTICATION'"/> -->
+                         </group>
+                          <group>   
+                                <field name="add_security_recommendation" invisible="category != 'AUTHENTICATION'"/>
+                         </group>
+
+                        
+                        <!-- Footer Section -->
+                        <group string="Footer (Optional)" class="mt16" invisible="category == 'AUTHENTICATION'">
+                            <field name="footer_text" placeholder="Enter footer text..."
+                                   invisible="category == 'AUTHENTICATION'"/>
+                            <field name="code_expiration_minutes" invisible="category != 'AUTHENTICATION'"/>
+                        </group>
+
+                          <!-- component data debug -->
+                          <group string="component data debug" class="mt16" invisible="1">
+                            <field name="component_data" invisible="1"/>
+                        </group>
+
+                        
+                        <!-- Buttons Section -->
+                        <group string="Buttons (Optional, max 3)" class="mt16" invisible="category == 'AUTHENTICATION'">
+                            
+                            <group string="Button 1" class="mt16">
+                                <field name="button_1_type"/>
+                                <field name="button_1_text" placeholder="Button text" invisible="not button_1_type"/> 
+                                <field name="button_1_url"  invisible="button_1_type != 'URL'" placeholder="https://example.com"/>
+                                <field name="button_1_url_example" invisible="1"/>
+                                <field name="button_1_phone_number" invisible="button_1_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
+                                <field name="button_1_phone_example" invisible="1"/>
+                                <field name="button_1_otp_type" invisible="button_1_type != 'OTP'"/>
+                            </group>
+                                 
+                            <group string="Button 2" class="mt16">
+                                <field name="button_2_type"/>
+                                <field name="button_2_text" placeholder="Button text" invisible="not button_2_type"/>
+                                <field name="button_2_url" invisible="button_2_type != 'URL'" placeholder="https://example.com"/>
+                                <field name="button_2_url_example" invisible="1"/>
+                                <field name="button_2_phone_number" invisible="button_2_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
+                                <field name="button_2_phone_example" invisible="1"/>
+                                <field name="button_2_otp_type" invisible="button_2_type != 'OTP'"/>
+                            </group>
+                            
+                            
+                            <group string="Button 3" class="mt16">
+                                <field name="button_3_type"/>
+                                <field name="button_3_text" placeholder="Button text" invisible="not button_3_type"/>
+                                <field name="button_3_url" invisible="button_3_type != 'URL'" placeholder="https://example.com"/>
+                                <field name="button_3_url_example" invisible="1"/>
+                                <field name="button_3_phone_number" invisible="button_3_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
+                                <field name="button_3_phone_example" invisible="1"/>
+                                <field name="button_3_otp_type" invisible="button_3_type != 'OTP'"/>
+                            </group>
+                        </group>
+
+
+                        
                     </sheet>
                 </form>
             </field>
@@ -69,7 +147,7 @@
             <field name="name">lipachat.template.tree</field>
             <field name="model">lipachat.template</field>
             <field name="arch" type="xml">
-                <tree string="WhatsApp Templates" decoration-success="status=='approved'" decoration-warning="status=='submitted'">
+                <tree string="WhatsApp Templates" decoration-success="status=='approved'" decoration-warning="status=='pending'" decoration-danger="status=='rejected'">
                     <field name="name"/>
                     <field name="category"/>
                     <field name="language"/>

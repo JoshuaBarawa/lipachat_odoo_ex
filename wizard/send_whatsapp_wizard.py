@@ -14,8 +14,6 @@ class SendWhatsappWizard(models.TransientModel):
     message_type = fields.Selection([
         ('text', 'Text Message'),
         ('media', 'Media Message'),
-        ('buttons', 'Interactive Buttons'),
-        ('list', 'Interactive List'),
         ('template', 'Template Message'),
     ], 'Message Type', default='text', required=True)
     

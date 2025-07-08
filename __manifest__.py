@@ -1,6 +1,6 @@
 {
     'name': 'LipaChat WhatsApp Gateway',
-    'version': '1.0.0',
+    'version': '17.0.1.0.0',
     'category': 'Communication',
     'summary': 'Send WhatsApp messages through LipaChat Gateway',
     'description': '''
@@ -10,8 +10,6 @@
         This module integrates Odoo with LipaChat WhatsApp Gateway API to:
         * Send text messages
         * Send media messages (images, videos, documents)
-        * Send interactive buttons
-        * Send interactive lists
         * Create and manage message templates
         * Track message delivery status
         
@@ -32,7 +30,7 @@
     'author': 'LipaChat Gateway',
     'website': 'https://lipachat.com',
     'license': 'LGPL-3',
-    'depends': ['base', 'mail', 'contacts'],
+    'depends': ['base', 'mail', 'contacts', 'web'],
     'data': [
         'security/ir.model.access.csv',
         'data/lipachat_data.xml',
@@ -54,6 +52,10 @@
     'assets': {
     'web.assets_backend': [
         'lipachat_odoo_ex/static/src/css/chat_interface.css',
+        'lipachat_odoo_ex/static/src/css/whatsapp_template.css',
+        'lipachat_odoo_ex/static/src/js/whatsapp_chat_client.js',
+        'lipachat_odoo_ex/static/src/js/lipachat_template_client.js',
     ],
    },
+   'post_init_hook': 'post_init_hook',
 }
