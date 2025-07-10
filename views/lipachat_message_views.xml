@@ -11,7 +11,6 @@
                     <header>
                         <button name="send_message" string="Send Message" type="object" class="btn-primary" 
                                 invisible="state != 'DRAFT'"/>
-                        <button name="fetch_all_messages" string="Sync Messages" type="object" class="oe_highlight"/>
                         <field name="state" widget="statusbar"/>
                     </header>
                     <sheet>
@@ -150,6 +149,9 @@
                     decoration-success="state=='READ'" 
                     decoration-danger="state=='FAILED'" 
                     decoration-warning="state=='partially_sent'">
+                    <header>
+                      <button name="fetch_all_messages" string="Sync Messages" type="object" display="always"/>
+                    </header>
                     <field name="create_date" string="Created on"/>
                     <field name="partner_id" string="Contact"/>
                     <field name="phone_number" string="Phone Number"/>
