@@ -572,58 +572,58 @@ class LipachatMessage(models.Model):
 
     
     def _find_or_create_partner(self, phone_number, name):
-        """Find existing partner by phone or create a new one"""
+        """Find or create partner with guaranteed name fallback"""
         if not phone_number:
+            _logger.warning("No phone number provided for partner lookup")
             return False
         
-        # Clean the phone number consistently
+        # Clean the phone number
         phone_clean = self._clean_phone_number(phone_number)
         
-        # First search by exact phone match
+        # Determine the final name to use
+        if not name or not isinstance(name, str) or not name.strip():
+            final_name = f"WhatsApp Contact {phone_clean}"
+            _logger.debug(f"Using fallback name: {final_name}")
+        else:
+            final_name = name.strip()
+            _logger.debug(f"Using provided name: {final_name}")
+        
+        # Find existing partner by phone
         partner = self.env['res.partner'].search([
             '|',
             ('phone', '=', phone_clean),
             ('mobile', '=', phone_clean)
         ], limit=1)
         
-        if not partner:
-            # Try with LIKE in case numbers are stored differently
-            partner = self.env['res.partner'].search([
-                '|',
-                ('phone', 'like', phone_clean),
-                ('mobile', 'like', phone_clean)
-            ], limit=1)
-        
         if partner:
-            # Update name if it's different (but not if it's a company)
-            if not partner.is_company and partner.name != name:
-                partner.name = name
+            # Update name if different (except for companies)
+            if not partner.is_company and partner.name != final_name:
+                try:
+                    partner.name = final_name
+                    _logger.debug(f"Updated partner {partner.id} name to '{final_name}'")
+                except Exception as e:
+                    _logger.error(f"Couldn't update partner name: {str(e)}")
             return partner
         
-        # Create new partner with proper encoding handling
+        # Create new partner
         try:
-            # Clean the name by removing any problematic characters
-            cleaned_name = name.encode('ascii', 'ignore').decode('ascii').strip()
-            if not cleaned_name:
-                cleaned_name = f"WhatsApp Contact {phone_clean}"
-                
             partner = self.env['res.partner'].create({
-                'name': cleaned_name,
+                'name': final_name,
                 'mobile': phone_clean,
                 'phone': phone_clean,
                 'is_company': False,
             })
+            _logger.info(f"Created new partner {partner.id} with name '{final_name}'")
             return partner
         except Exception as e:
-            _logger.error(f"Failed to create partner for {phone_clean}: {str(e)}")
-            # Fallback to a basic name if creation fails
-            partner = self.env['res.partner'].create({
+            _logger.error(f"Partner creation failed: {str(e)} - Using ultimate fallback")
+            # Ultimate fallback if even this fails
+            return self.env['res.partner'].create({
                 'name': f"WhatsApp Contact {phone_clean}",
                 'mobile': phone_clean,
                 'phone': phone_clean,
                 'is_company': False,
             })
-            return partner
         
     
     def _get_whatsapp_category_id(self, name):
