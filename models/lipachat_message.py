@@ -136,8 +136,8 @@ class LipachatMessage(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('Messages Synced'),
-                    'message': _('%d new messages added.') % total_new,
+                    'title': 'Messages Synced',
+                    'message': '%d new messages added.' % total_new,
                     'type': 'success',
                     'sticky': False,
                 }
@@ -147,8 +147,8 @@ class LipachatMessage(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('Sync Failed'),
-                    'message': _('Error fetching messages: %s') % str(e),
+                    'title': 'Sync Failed',
+                    'message': 'Error fetching messages: %s' % str(e),
                     'type': 'danger',
                     'sticky': True,
                 }
@@ -156,7 +156,7 @@ class LipachatMessage(models.Model):
     
 
     def _fetch_messages_for_config(self, config):
-        """Fetch all messages from API and filter client-side"""
+        """Fetch messages for a specific configuration"""
         if not config.api_key:
             raise ValidationError(_("API key not configured for %s") % config.name)
         
@@ -166,45 +166,80 @@ class LipachatMessage(models.Model):
         }
 
         try:
-            # Make single API call to get all messages
-            response = requests.get(
+            # Initialize variables
+            all_messages = []
+            page = 0
+            total_pages = 1  # Will be updated from first response
+            page_size = 100  # Maximum page size to reduce number of requests
+            
+            # First request to get total pages without parameters
+            initial_response = requests.get(
                 f"{config.api_base_url}/whatsapp/message",
                 headers=headers,
                 timeout=30
             )
             
-            if response.status_code != 200:
+            if initial_response.status_code != 200:
                 raise ValidationError(_("Failed to fetch messages: HTTP %d - %s") % 
-                                (response.status_code, response.text))
+                                    (initial_response.status_code, initial_response.text))
             
             try:
-                response_data = response.json()
-                all_messages = response_data.get('data', [])
-                _logger.info(f"Fetched {len(all_messages)} raw messages from API")
-                
-                # Get the newest message we already have in the system
-                last_message = self.search([], order='create_date desc', limit=1)
-                if last_message:
-                    last_message_time = last_message.create_date
-                    # Filter messages to only those newer than our last message
-                    messages = [
-                        msg for msg in all_messages 
-                        if self._parse_timestamp(msg.get('createdAt')) > last_message_time
-                    ]
-                    _logger.info(f"Filtered to {len(messages)} new messages")
-                else:
-                    messages = all_messages
-                    _logger.info("No existing messages, processing all fetched messages")
-                
-                return self._process_fetched_messages(messages, config)
-                
+                initial_data = initial_response.json()
+                total_pages = initial_data.get('totalPages', 1)
+                _logger.info(f"Total pages to fetch: {total_pages}")
             except ValueError as e:
-                _logger.error(f"Invalid JSON response: {response.text}")
+                _logger.error(f"Invalid JSON response: {initial_response.text}")
                 raise ValidationError(_("Invalid API response format"))
+            
+            # Now fetch all pages with pagination
+            while page < total_pages:
+                params = {
+                    'page': page,
+                    'size': page_size
+                }
+                
+                response = requests.get(
+                    f"{config.api_base_url}/whatsapp/message",
+                    headers=headers,
+                    params=params,
+                    timeout=30
+                )
+                
+                _logger.info(f"Fetching page {page + 1}/{total_pages} with size {page_size}")
+                
+                if response.status_code != 200:
+                    _logger.error(f"Failed to fetch page {page}: HTTP {response.status_code}")
+                    page += 1
+                    continue  # Skip to next page instead of failing completely
+                
+                try:
+                    response_data = response.json()
+                    messages = response_data.get('data', [])
+                    
+                    if messages:
+                        all_messages.extend(messages)
+                        _logger.info(f"Fetched {len(messages)} messages from page {page + 1}")
+                    
+                    # Update total pages in case it changed
+                    current_total = response_data.get('totalPages', total_pages)
+                    if current_total != total_pages:
+                        _logger.info(f"Total pages updated from {total_pages} to {current_total}")
+                        total_pages = current_total
+                    
+                except ValueError as e:
+                    _logger.error(f"Invalid JSON in page {page}: {response.text}")
+                    page += 1
+                    continue
+                
+                page += 1
+            
+            _logger.info(f"Total messages fetched: {len(all_messages)}")
+            return self._process_fetched_messages(all_messages, config)
             
         except requests.exceptions.RequestException as e:
             _logger.error(f"Network error while fetching messages: {str(e)}")
             raise ValidationError(_("Network error while fetching messages: %s") % str(e))
+        
         
     
 
@@ -338,23 +373,23 @@ class LipachatMessage(models.Model):
                     return existing_msg
         
 
-        def _create_message_record_safe(self, vals_without_timestamps, create_date, write_date):
-            """Safely create message record with proper timestamp handling"""
-            record = self.create(vals_without_timestamps)
+        # def _create_message_record_safe(self, vals_without_timestamps, create_date, write_date):
+        #     """Safely create message record with proper timestamp handling"""
+        #     record = self.create(vals_without_timestamps)
             
-            # Then update the timestamps directly in the database
-            # This bypasses Odoo's ORM restrictions on system fields
-            self.env.cr.execute("""
-                UPDATE %s 
-                SET create_date = %%s, write_date = %%s 
-                WHERE id = %%s
-            """ % record._table, (create_date, write_date, record.id))
+        #     # Then update the timestamps directly in the database
+        #     # This bypasses Odoo's ORM restrictions on system fields
+        #     self.env.cr.execute("""
+        #         UPDATE %s 
+        #         SET create_date = %%s, write_date = %%s 
+        #         WHERE id = %%s
+        #     """ % record._table, (create_date, write_date, record.id))
             
-            # Invalidate cache to ensure the updated values are reflected
-            record.invalidate_cache(['create_date', 'write_date'])
+        #     # Invalidate cache to ensure the updated values are reflected
+        #     record.invalidate_cache(['create_date', 'write_date'])
             
-            _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
-            return record
+        #     _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
+        #     return record
 
         return False
     
@@ -1044,7 +1079,7 @@ class IrCronInherit(models.Model):
     @api.constrains('interval_type', 'interval_number')
     def _check_interval_seconds(self):
         for record in self:
-            if record.interval_type == 'seconds' and record.interval_number < 30:
+            if record.interval_type == 'seconds' and record.interval_number < 60:
                 raise ValidationError(
                     "Minimum interval for seconds is 10 seconds to prevent system overload."
                 )
