@@ -407,12 +407,13 @@ class LipachatMessage(models.Model):
             # Get contact information
             contact_data = msg_data.get('contact', {})
             phone_number = contact_data.get('phoneNumber', '')
+            username = contact_data.get('name', '')
             
             # Find or create partner
             partner_id = False
             if phone_number:
                 phone_clean = self._clean_phone_number(phone_number)
-                partner = self._find_or_create_partner(phone_clean)
+                partner = self._find_or_create_partner(phone_clean, username)
                 partner_id = partner.id if partner else False
             
             # Determine message type and content
@@ -493,7 +494,7 @@ class LipachatMessage(models.Model):
             """ % record._table, (create_date, write_date, record.id))
             
             # Invalidate cache to ensure the updated values are reflected
-            record.invalidate_cache(['create_date', 'write_date'])
+            record.invalidate_model(['create_date', 'write_date'])
             
             _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
         
@@ -570,40 +571,67 @@ class LipachatMessage(models.Model):
         
 
     
-    def _find_or_create_partner(self, phone_number):
+    def _find_or_create_partner(self, phone_number, name):
         """Find existing partner by phone or create a new one"""
         if not phone_number:
             return False
         
-        # Search for existing partner
+        # Clean the phone number consistently
+        phone_clean = self._clean_phone_number(phone_number)
+        
+        # First search by exact phone match
         partner = self.env['res.partner'].search([
             '|',
-            ('phone', 'ilike', phone_number),
-            ('mobile', 'ilike', phone_number)
+            ('phone', '=', phone_clean),
+            ('mobile', '=', phone_clean)
         ], limit=1)
         
+        if not partner:
+            # Try with LIKE in case numbers are stored differently
+            partner = self.env['res.partner'].search([
+                '|',
+                ('phone', 'like', phone_clean),
+                ('mobile', 'like', phone_clean)
+            ], limit=1)
+        
         if partner:
+            # Update name if it's different (but not if it's a company)
+            if not partner.is_company and partner.name != name:
+                partner.name = name
             return partner
         
-        # Create new partner
+        # Create new partner with proper encoding handling
         try:
+            # Clean the name by removing any problematic characters
+            cleaned_name = name.encode('ascii', 'ignore').decode('ascii').strip()
+            if not cleaned_name:
+                cleaned_name = f"WhatsApp Contact {phone_clean}"
+                
             partner = self.env['res.partner'].create({
-                'name': f"WhatsApp Contact {phone_number}",
-                'mobile': phone_number,
+                'name': cleaned_name,
+                'mobile': phone_clean,
+                'phone': phone_clean,
                 'is_company': False,
-                'category_id': [(4, self._get_whatsapp_category_id())],
             })
             return partner
         except Exception as e:
-            _logger.error(f"Failed to create partner for {phone_number}: {str(e)}")
-            return False
+            _logger.error(f"Failed to create partner for {phone_clean}: {str(e)}")
+            # Fallback to a basic name if creation fails
+            partner = self.env['res.partner'].create({
+                'name': f"WhatsApp Contact {phone_clean}",
+                'mobile': phone_clean,
+                'phone': phone_clean,
+                'is_company': False,
+            })
+            return partner
+        
     
-    def _get_whatsapp_category_id(self):
+    def _get_whatsapp_category_id(self, name):
         """Get or create WhatsApp contact category"""
-        category = self.env['res.partner.category'].search([('name', '=', 'WhatsApp Contact')], limit=1)
+        category = self.env['res.partner.category'].search([('name', '=', name)], limit=1)
         if not category:
             category = self.env['res.partner.category'].create({
-                'name': 'WhatsApp Contact',
+                'name': name,
                 'color': 10,  # Green color
             })
         return category.id

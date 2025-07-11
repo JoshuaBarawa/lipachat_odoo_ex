@@ -150,7 +150,8 @@
                     decoration-danger="state=='FAILED'" 
                     decoration-warning="state=='partially_sent'">
                     <header>
-                      <button name="fetch_all_messages" string="Sync Messages" type="object" display="always"/>
+                      <button name="fetch_all_messages" string="Sync Messages" type="object" display="always"
+                      title="Manually Fetch Messages"/>
                     </header>
                     <field name="create_date" string="Created on"/>
                     <field name="partner_id" string="Contact"/>
