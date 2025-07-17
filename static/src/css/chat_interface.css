@@ -255,6 +255,7 @@
     width: 100% !important;
     display: flex;
     flex-wrap: wrap;
+    font-size: 10px !important;
 }
 
 .template-message-group .o_input {

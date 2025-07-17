@@ -75,7 +75,7 @@ class LipachatMessage(models.Model):
     template_name = fields.Many2one('lipachat.template', string='Template', domain=lambda self: self._get_template_domain())
     template_media_url = fields.Char('Media URL', readonly="state != 'draft'")
     template_variables = fields.Char('Template Variables', compute='_compute_template_variables', store=False)
-    template_placeholders = fields.Text('Placeholder Values', default='[]')
+    template_placeholders = fields.Text('Placeholder Values')
     
     # Status fields
     state = fields.Selection([
@@ -136,8 +136,8 @@ class LipachatMessage(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('Messages Synced'),
-                    'message': _('%d new messages added.') % total_new,
+                    'title': 'Messages Synced',
+                    'message': '%d new messages added.' % total_new,
                     'type': 'success',
                     'sticky': False,
                 }
@@ -147,8 +147,8 @@ class LipachatMessage(models.Model):
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': _('Sync Failed'),
-                    'message': _('Error fetching messages: %s') % str(e),
+                    'title': 'Sync Failed',
+                    'message': 'Error fetching messages: %s' % str(e),
                     'type': 'danger',
                     'sticky': True,
                 }
@@ -156,7 +156,7 @@ class LipachatMessage(models.Model):
     
 
     def _fetch_messages_for_config(self, config):
-        """Fetch all messages from API and filter client-side"""
+        """Fetch messages for a specific configuration"""
         if not config.api_key:
             raise ValidationError(_("API key not configured for %s") % config.name)
         
@@ -166,45 +166,80 @@ class LipachatMessage(models.Model):
         }
 
         try:
-            # Make single API call to get all messages
-            response = requests.get(
+            # Initialize variables
+            all_messages = []
+            page = 0
+            total_pages = 1  # Will be updated from first response
+            page_size = 100  # Maximum page size to reduce number of requests
+            
+            # First request to get total pages without parameters
+            initial_response = requests.get(
                 f"{config.api_base_url}/whatsapp/message",
                 headers=headers,
                 timeout=30
             )
             
-            if response.status_code != 200:
+            if initial_response.status_code != 200:
                 raise ValidationError(_("Failed to fetch messages: HTTP %d - %s") % 
-                                (response.status_code, response.text))
+                                    (initial_response.status_code, initial_response.text))
             
             try:
-                response_data = response.json()
-                all_messages = response_data.get('data', [])
-                _logger.info(f"Fetched {len(all_messages)} raw messages from API")
-                
-                # Get the newest message we already have in the system
-                last_message = self.search([], order='create_date desc', limit=1)
-                if last_message:
-                    last_message_time = last_message.create_date
-                    # Filter messages to only those newer than our last message
-                    messages = [
-                        msg for msg in all_messages 
-                        if self._parse_timestamp(msg.get('createdAt')) > last_message_time
-                    ]
-                    _logger.info(f"Filtered to {len(messages)} new messages")
-                else:
-                    messages = all_messages
-                    _logger.info("No existing messages, processing all fetched messages")
-                
-                return self._process_fetched_messages(messages, config)
-                
+                initial_data = initial_response.json()
+                total_pages = initial_data.get('totalPages', 1)
+                _logger.info(f"Total pages to fetch: {total_pages}")
             except ValueError as e:
-                _logger.error(f"Invalid JSON response: {response.text}")
+                _logger.error(f"Invalid JSON response: {initial_response.text}")
                 raise ValidationError(_("Invalid API response format"))
+            
+            # Now fetch all pages with pagination
+            while page < total_pages:
+                params = {
+                    'page': page,
+                    'size': page_size
+                }
+                
+                response = requests.get(
+                    f"{config.api_base_url}/whatsapp/message",
+                    headers=headers,
+                    params=params,
+                    timeout=30
+                )
+                
+                _logger.info(f"Fetching page {page + 1}/{total_pages} with size {page_size}")
+                
+                if response.status_code != 200:
+                    _logger.error(f"Failed to fetch page {page}: HTTP {response.status_code}")
+                    page += 1
+                    continue  # Skip to next page instead of failing completely
+                
+                try:
+                    response_data = response.json()
+                    messages = response_data.get('data', [])
+                    
+                    if messages:
+                        all_messages.extend(messages)
+                        _logger.info(f"Fetched {len(messages)} messages from page {page + 1}")
+                    
+                    # Update total pages in case it changed
+                    current_total = response_data.get('totalPages', total_pages)
+                    if current_total != total_pages:
+                        _logger.info(f"Total pages updated from {total_pages} to {current_total}")
+                        total_pages = current_total
+                    
+                except ValueError as e:
+                    _logger.error(f"Invalid JSON in page {page}: {response.text}")
+                    page += 1
+                    continue
+                
+                page += 1
+            
+            _logger.info(f"Total messages fetched: {len(all_messages)}")
+            return self._process_fetched_messages(all_messages, config)
             
         except requests.exceptions.RequestException as e:
             _logger.error(f"Network error while fetching messages: {str(e)}")
             raise ValidationError(_("Network error while fetching messages: %s") % str(e))
+        
         
     
 
@@ -338,23 +373,23 @@ class LipachatMessage(models.Model):
                     return existing_msg
         
 
-        def _create_message_record_safe(self, vals_without_timestamps, create_date, write_date):
-            """Safely create message record with proper timestamp handling"""
-            record = self.create(vals_without_timestamps)
+        # def _create_message_record_safe(self, vals_without_timestamps, create_date, write_date):
+        #     """Safely create message record with proper timestamp handling"""
+        #     record = self.create(vals_without_timestamps)
             
-            # Then update the timestamps directly in the database
-            # This bypasses Odoo's ORM restrictions on system fields
-            self.env.cr.execute("""
-                UPDATE %s 
-                SET create_date = %%s, write_date = %%s 
-                WHERE id = %%s
-            """ % record._table, (create_date, write_date, record.id))
+        #     # Then update the timestamps directly in the database
+        #     # This bypasses Odoo's ORM restrictions on system fields
+        #     self.env.cr.execute("""
+        #         UPDATE %s 
+        #         SET create_date = %%s, write_date = %%s 
+        #         WHERE id = %%s
+        #     """ % record._table, (create_date, write_date, record.id))
             
-            # Invalidate cache to ensure the updated values are reflected
-            record.invalidate_cache(['create_date', 'write_date'])
+        #     # Invalidate cache to ensure the updated values are reflected
+        #     record.invalidate_cache(['create_date', 'write_date'])
             
-            _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
-            return record
+        #     _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
+        #     return record
 
         return False
     
@@ -372,12 +407,13 @@ class LipachatMessage(models.Model):
             # Get contact information
             contact_data = msg_data.get('contact', {})
             phone_number = contact_data.get('phoneNumber', '')
+            username = contact_data.get('name', '')
             
             # Find or create partner
             partner_id = False
             if phone_number:
                 phone_clean = self._clean_phone_number(phone_number)
-                partner = self._find_or_create_partner(phone_clean)
+                partner = self._find_or_create_partner(phone_clean, username)
                 partner_id = partner.id if partner else False
             
             # Determine message type and content
@@ -458,7 +494,7 @@ class LipachatMessage(models.Model):
             """ % record._table, (create_date, write_date, record.id))
             
             # Invalidate cache to ensure the updated values are reflected
-            record.invalidate_cache(['create_date', 'write_date'])
+            record.invalidate_model(['create_date', 'write_date'])
             
             _logger.debug(f"Updated message {record.id} with create_date: {create_date}, write_date: {write_date}")
         
@@ -535,40 +571,67 @@ class LipachatMessage(models.Model):
         
 
     
-    def _find_or_create_partner(self, phone_number):
-        """Find existing partner by phone or create a new one"""
+    def _find_or_create_partner(self, phone_number, name):
+        """Find or create partner with guaranteed name fallback"""
         if not phone_number:
+            _logger.warning("No phone number provided for partner lookup")
             return False
         
-        # Search for existing partner
+        # Clean the phone number
+        phone_clean = self._clean_phone_number(phone_number)
+        
+        # Determine the final name to use
+        if not name or not isinstance(name, str) or not name.strip():
+            final_name = f"WhatsApp Contact {phone_clean}"
+            _logger.debug(f"Using fallback name: {final_name}")
+        else:
+            final_name = name.strip()
+            _logger.debug(f"Using provided name: {final_name}")
+        
+        # Find existing partner by phone
         partner = self.env['res.partner'].search([
             '|',
-            ('phone', 'ilike', phone_number),
-            ('mobile', 'ilike', phone_number)
+            ('phone', '=', phone_clean),
+            ('mobile', '=', phone_clean)
         ], limit=1)
         
         if partner:
+            # Update name if different (except for companies)
+            if not partner.is_company and partner.name != final_name:
+                try:
+                    partner.name = final_name
+                    _logger.debug(f"Updated partner {partner.id} name to '{final_name}'")
+                except Exception as e:
+                    _logger.error(f"Couldn't update partner name: {str(e)}")
             return partner
         
         # Create new partner
         try:
             partner = self.env['res.partner'].create({
-                'name': f"WhatsApp Contact {phone_number}",
-                'mobile': phone_number,
+                'name': final_name,
+                'mobile': phone_clean,
+                'phone': phone_clean,
                 'is_company': False,
-                'category_id': [(4, self._get_whatsapp_category_id())],
             })
+            _logger.info(f"Created new partner {partner.id} with name '{final_name}'")
             return partner
         except Exception as e:
-            _logger.error(f"Failed to create partner for {phone_number}: {str(e)}")
-            return False
+            _logger.error(f"Partner creation failed: {str(e)} - Using ultimate fallback")
+            # Ultimate fallback if even this fails
+            return self.env['res.partner'].create({
+                'name': f"WhatsApp Contact {phone_clean}",
+                'mobile': phone_clean,
+                'phone': phone_clean,
+                'is_company': False,
+            })
+        
     
-    def _get_whatsapp_category_id(self):
+    def _get_whatsapp_category_id(self, name):
         """Get or create WhatsApp contact category"""
-        category = self.env['res.partner.category'].search([('name', '=', 'WhatsApp Contact')], limit=1)
+        category = self.env['res.partner.category'].search([('name', '=', name)], limit=1)
         if not category:
             category = self.env['res.partner.category'].create({
-                'name': 'WhatsApp Contact',
+                'name': name,
                 'color': 10,  # Green color
             })
         return category.id
@@ -1044,7 +1107,7 @@ class IrCronInherit(models.Model):
     @api.constrains('interval_type', 'interval_number')
     def _check_interval_seconds(self):
         for record in self:
-            if record.interval_type == 'seconds' and record.interval_number < 30:
+            if record.interval_type == 'seconds' and record.interval_number < 60:
                 raise ValidationError(
                     "Minimum interval for seconds is 10 seconds to prevent system overload."
                 )
