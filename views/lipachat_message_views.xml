@@ -100,7 +100,7 @@
                                     <field name="template_placeholders" 
                                         string="Template Variables"
                                         widget="char" 
-                                        placeholder="Enter values for template variables as JSON (e.g., {'name': 'John', 'company': 'ABC Corp'})"
+                                        placeholder="Enter values for template variables e.i John, Monday "
                                         invisible="template_variables == '[]'"
                                         readonly="state != 'DRAFT'"/>
 

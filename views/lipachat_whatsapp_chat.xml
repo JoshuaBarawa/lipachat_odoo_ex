@@ -57,7 +57,7 @@
                                 <div class="chat-input-container">
 
                                 
-                                    <group string="Template Message (Send Template to activate session with user)" class="template-message-group">
+                                    <group string="Template Message (You can only send template message unless contact activates session by sending join code to your number)" class="template-message-group">
                                         <field name="template_name" placeholder="Select a template" nolabel="1"/>
 
                                         <!-- Media URL field (only shown if template has media) -->

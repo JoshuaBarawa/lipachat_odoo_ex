@@ -174,11 +174,6 @@ class WhatsappChat(models.TransientModel):
             if not template.exists():
                 raise ValidationError("Selected template not found")
 
-            # Check session via API only
-            session_info = self.check_contact_active_session(partner.mobile or partner.phone)
-            if not session_info.get('session_active'):
-                raise ValidationError("No active session found. Please check the contact's session status.")
-
             components = self._prepare_template_components(template, placeholders, media_url)
             _logger.info(f"Template component data: "+json.dumps(components))
 
@@ -231,12 +226,17 @@ class WhatsappChat(models.TransientModel):
                 })
 
                 self._clear_template_data()
-                
                 return {
-                    'status': 'success',
-                    'message': 'Template message sent successfully!',
-                    'session_info': session_info
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': 'Success',
+                        'message': 'Template message sent successfully!',
+                        'type': 'success',
+                        'sticky': False,
+                    }
                 }
+
             else:
                 error_msg = response_data.get('message', 'Unknown error')
                 raise ValidationError(f"Failed to send template: {error_msg}")

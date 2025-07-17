@@ -57,4 +57,5 @@
         'lipachat_odoo_ex/static/src/js/lipachat_template_client.js',
     ],
    },
+   'uninstall_hook': 'uninstall_hook',
 }

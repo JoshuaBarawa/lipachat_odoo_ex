@@ -75,7 +75,7 @@ class LipachatMessage(models.Model):
     template_name = fields.Many2one('lipachat.template', string='Template', domain=lambda self: self._get_template_domain())
     template_media_url = fields.Char('Media URL', readonly="state != 'draft'")
     template_variables = fields.Char('Template Variables', compute='_compute_template_variables', store=False)
-    template_placeholders = fields.Text('Placeholder Values', default='[]')
+    template_placeholders = fields.Text('Placeholder Values')
     
     # Status fields
     state = fields.Selection([

@@ -16,14 +16,14 @@
                     <sheet>
                         <!-- First row with Template Name, Category, and Language -->
                         <group class="flex-container">
-                            <field name="name" class="flex-item"/>
-                            <field name="category" class="flex-item"/>
-                            <field name="language" class="flex-item"/>
+                            <field name="name" class="flex-item" readonly="status != 'draft'"/>
+                            <field name="category" class="flex-item" readonly="status != 'draft'"/>
+                            <field name="language" class="flex-item" readonly="status != 'draft'"/>
                         </group>
 
                         <!-- Phone number field -->
                         <group string="WABA Phone Number" class="mt16">
-                            <field name="phone_number" widget="phone" placeholder="Example: 254110090747"/>
+                            <field name="phone_number" widget="phone" placeholder="Example: 254110090747" readonly="status != 'draft'"/>
                         </group>
                         
                         <!-- Header Section -->
@@ -31,11 +31,11 @@
                         
                             <field name="header_media_id" invisible="1" force_save="1"/>
 
-                            <field name="header_type"/>
+                            <field name="header_type" readonly="status != 'draft'"/>
                             <field name="header_text" invisible="header_type != 'TEXT'" 
-                                   placeholder="Enter header text (use {{1}}, {{2}} for variables)"/>
+                                   placeholder="Enter header text (use {{1}}, {{2}} for variables)" readonly="status != 'draft'"/>
                             <field name="header_example" invisible="header_type != 'TEXT'" 
-                                   placeholder="Example value for {{1}}"/>
+                                   placeholder="Example value for {{1}}" readonly="status != 'draft'"/>
                          </group>
 
                         <!-- Media Upload Section -->
@@ -43,8 +43,8 @@
                             <group>
                                 <!-- File upload field - always visible when media type is selected -->
                                     <field name="header_media" filename="header_media_filename"
-                                            invisible="header_type == 'TEXT' or not header_type"/>
-                                    <field name="header_media_filename" invisible="1"/>
+                                            invisible="header_type == 'TEXT' or not header_type" readonly="status != 'draft'"/>
+                                    <field name="header_media_filename" invisible="1" readonly="status != 'draft'"/>
                                 
                                 <!-- Hidden fields for upload status -->
                                 <field name="is_uploading_media" invisible="1"/>
@@ -74,7 +74,7 @@
                         <!-- Body Section -->
                          <group string="Body" class="mt16">   
                                 <field name="body_text" nolabel="1" placeholder="Enter your message (use {{1}}, {{2}} for variables)"
-                                    invisible="category == 'AUTHENTICATION'" class="body-message-field"/><br/>
+                                    invisible="category == 'AUTHENTICATION'" class="body-message-field" readonly="status != 'draft'"/><br/>
                          </group>
                           <group class="mt16">   
                             <!-- Remove or hide the body_examples field group -->
@@ -83,15 +83,15 @@
                             <!-- <field name="body_examples" placeholder='i.e ["Example 1", "Example 2"]' invisible="category == 'AUTHENTICATION'"/> -->
                          </group>
                           <group>   
-                                <field name="add_security_recommendation" invisible="category != 'AUTHENTICATION'"/>
+                                <field name="add_security_recommendation" invisible="category != 'AUTHENTICATION'" readonly="status != 'draft'"/>
                          </group>
 
                         
                         <!-- Footer Section -->
                         <group string="Footer (Optional)" class="mt16" invisible="category == 'AUTHENTICATION'">
                             <field name="footer_text" placeholder="Enter footer text..."
-                                   invisible="category == 'AUTHENTICATION'"/>
-                            <field name="code_expiration_minutes" invisible="category != 'AUTHENTICATION'"/>
+                                   invisible="category == 'AUTHENTICATION'" readonly="status != 'draft'"/>
+                            <field name="code_expiration_minutes" invisible="category != 'AUTHENTICATION'" readonly="status != 'draft'"/>
                         </group>
 
                           <!-- component data debug -->
@@ -104,38 +104,36 @@
                         <group string="Buttons (Optional, max 3)" class="mt16" invisible="category == 'AUTHENTICATION'">
                             
                             <group string="Button 1" class="mt16">
-                                <field name="button_1_type"/>
-                                <field name="button_1_text" placeholder="Button text" invisible="not button_1_type"/> 
-                                <field name="button_1_url"  invisible="button_1_type != 'URL'" placeholder="https://example.com"/>
-                                <field name="button_1_url_example" invisible="1"/>
-                                <field name="button_1_phone_number" invisible="button_1_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
-                                <field name="button_1_phone_example" invisible="1"/>
-                                <field name="button_1_otp_type" invisible="button_1_type != 'OTP'"/>
+                                <field name="button_1_type" readonly="status != 'draft'"/>
+                                <field name="button_1_text" placeholder="Button text" invisible="not button_1_type" readonly="status != 'draft'"/> 
+                                <field name="button_1_url"  invisible="button_1_type != 'URL'" placeholder="https://example.com" readonly="status != 'draft'"/>
+                                <field name="button_1_url_example" invisible="1" readonly="status != 'draft'"/>
+                                <field name="button_1_phone_number" invisible="button_1_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678" readonly="status != 'draft'"/>
+                                <field name="button_1_phone_example" invisible="1" readonly="status != 'draft'"/>
+                                <field name="button_1_otp_type" invisible="button_1_type != 'OTP'" readonly="status != 'draft'"/>
                             </group>
                                  
-                            <group string="Button 2" class="mt16">
-                                <field name="button_2_type"/>
-                                <field name="button_2_text" placeholder="Button text" invisible="not button_2_type"/>
-                                <field name="button_2_url" invisible="button_2_type != 'URL'" placeholder="https://example.com"/>
-                                <field name="button_2_url_example" invisible="1"/>
-                                <field name="button_2_phone_number" invisible="button_2_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
-                                <field name="button_2_phone_example" invisible="1"/>
-                                <field name="button_2_otp_type" invisible="button_2_type != 'OTP'"/>
+                            <group string="Button 2" class="mt16" readonly="status != 'draft'">
+                                <field name="button_2_type" readonly="status != 'draft'"/>
+                                <field name="button_2_text" placeholder="Button text" invisible="not button_2_type" readonly="status != 'draft'"/>
+                                <field name="button_2_url" invisible="button_2_type != 'URL'" placeholder="https://example.com" readonly="status != 'draft'"/>
+                                <field name="button_2_url_example" invisible="1" readonly="status != 'draft'"/>
+                                <field name="button_2_phone_number" invisible="button_2_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678" readonly="status != 'draft'"/>
+                                <field name="button_2_phone_example" invisible="1" readonly="status != 'draft'"/>
+                                <field name="button_2_otp_type" invisible="button_2_type != 'OTP'" readonly="status != 'draft'"/>
                             </group>
                             
                             
                             <group string="Button 3" class="mt16">
-                                <field name="button_3_type"/>
-                                <field name="button_3_text" placeholder="Button text" invisible="not button_3_type"/>
-                                <field name="button_3_url" invisible="button_3_type != 'URL'" placeholder="https://example.com"/>
-                                <field name="button_3_url_example" invisible="1"/>
-                                <field name="button_3_phone_number" invisible="button_3_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678"/>
-                                <field name="button_3_phone_example" invisible="1"/>
-                                <field name="button_3_otp_type" invisible="button_3_type != 'OTP'"/>
+                                <field name="button_3_type" readonly="status != 'draft'"/>
+                                <field name="button_3_text" placeholder="Button text" invisible="not button_3_type" readonly="status != 'draft'"/>
+                                <field name="button_3_url" invisible="button_3_type != 'URL'" placeholder="https://example.com" readonly="status != 'draft'"/>
+                                <field name="button_3_url_example" invisible="1" readonly="status != 'draft'"/>
+                                <field name="button_3_phone_number" invisible="button_3_type != 'PHONE_NUMBER'" widget="phone" placeholder="254712345678" readonly="status != 'draft'"/>
+                                <field name="button_3_phone_example" invisible="1" readonly="status != 'draft'"/>
+                                <field name="button_3_otp_type" invisible="button_3_type != 'OTP'" readonly="status != 'draft'"/>
                             </group>
                         </group>
-
-
                         
                     </sheet>
                 </form>
