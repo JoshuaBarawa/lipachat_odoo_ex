@@ -51,10 +51,10 @@
     },
     'assets': {
     'web.assets_backend': [
-        'lipachat_odoo_ex/static/src/css/chat_interface.css',
-        'lipachat_odoo_ex/static/src/css/whatsapp_template.css',
-        'lipachat_odoo_ex/static/src/js/whatsapp_chat_client.js',
-        'lipachat_odoo_ex/static/src/js/lipachat_template_client.js',
+        'lipachat_odoo_extension/static/src/css/chat_interface.css',
+        'lipachat_odoo_extension/static/src/css/whatsapp_template.css',
+        'lipachat_odoo_extension/static/src/js/whatsapp_chat_client.js',
+        'lipachat_odoo_extension/static/src/js/lipachat_template_client.js',
     ],
    },
    'uninstall_hook': 'uninstall_hook',
