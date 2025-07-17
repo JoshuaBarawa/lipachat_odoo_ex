@@ -1,5 +1,5 @@
 {
-    'name': 'LipaChat WhatsApp Gateway',
+    'name': 'LipaChat WhatsApp',
     'version': '17.0.1.0.0',
     'category': 'Communication',
     'summary': 'Send WhatsApp messages through LipaChat Gateway',
@@ -57,5 +57,6 @@
         'lipachat_odoo_extension/static/src/js/lipachat_template_client.js',
     ],
    },
+   'images': ['static/description/icon.png'],
    'uninstall_hook': 'uninstall_hook',
 }
